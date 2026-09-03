@@ -400,9 +400,10 @@
   let tileFailCount = 0;
 
   function makeSatLayer() {
-    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    return L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 20,
       maxNativeZoom: 19,
+      crossOrigin: true,
       attribution: 'Tiles © Esri — Esri, Maxar, Earthstar Geographics'
     });
   }
@@ -441,7 +442,17 @@
   }
   function refreshMapSize() {
     if (!map) return;
-    try { map.invalidateSize(true); } catch (e) {}
+    try {
+      const el = document.getElementById('map');
+      const vv = window.visualViewport;
+      const w = Math.round((vv && vv.width) || window.innerWidth || document.documentElement.clientWidth);
+      const h = Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight);
+      if (el && w > 0 && h > 0) {
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+      }
+      map.invalidateSize(true);
+    } catch (e) {}
   }
 
   function initMap() {
@@ -1083,7 +1094,13 @@
 
   function registerSw() {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Drop any old SW that intercepted map tiles (blank black map)
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      const waiting = regs.map((r) => r.unregister());
+      return Promise.all(waiting);
+    }).then(() => caches.keys()).then((keys) =>
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v3').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=3')).catch(() => {});
   }
 
   function showBootError(msg) {
