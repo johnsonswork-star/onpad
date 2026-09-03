@@ -1,3 +1,4 @@
 .DS_Store
 *.log
+# Frozen: do not commit Icon Shop copies. Do not wire /workspace/onpad-icons/ until Chris unfreezes.
 img/

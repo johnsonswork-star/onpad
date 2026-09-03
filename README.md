@@ -36,8 +36,12 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=9`, service worker `onpad-v9`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=11`, service worker `onpad-v11`).
 
 ## Stack
 
 Plain HTML / CSS / JS. Leaflet + Esri World Imagery. MQTT for optional live. PWA manifest + service worker.
+
+## Icons
+
+**Frozen.** Keep the current in-app glyphs. Do not copy or inline `/workspace/onpad-icons/` (or `img/`) until Chris picks a set.
