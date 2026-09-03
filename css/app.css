@@ -19,6 +19,13 @@
   --dozer: #f0c040;
   --excavator: #e07030;
   --water-role: #3a9ad9;
+  --survey: #7cb87a;
+  --foreman: #d8a020;
+  --geology: #c07840;
+  --mechanic: #9aa0a8;
+  --trucker: #6a9a48;
+  --laborer: #c4a070;
+  --fuel: #d89030;
   --shadow: 0 4px 0 #00000088;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
@@ -136,6 +143,13 @@ body.truck-open .leaflet-bottom {
 .role-dozer { color: var(--dozer); border-color: #a88820; }
 .role-excavator { color: var(--excavator); border-color: #a05020; }
 .role-water { color: var(--water-role); border-color: #2a6a90; }
+.role-survey { color: var(--survey); border-color: #4a7a48; }
+.role-foreman { color: var(--foreman); border-color: #8a7018; }
+.role-geology { color: var(--geology); border-color: #8a5028; }
+.role-mechanic { color: var(--mechanic); border-color: #5a6068; }
+.role-trucker { color: var(--trucker); border-color: #3a6a28; }
+.role-laborer { color: var(--laborer); border-color: #8a7048; }
+.role-fuel { color: var(--fuel); border-color: #8a5818; }
 
 .identity-meta {
   display: flex;
@@ -413,6 +427,8 @@ body.rails-right-open .selected-bar {
 }
 .sheet-card {
   width: min(520px, 100%);
+  max-height: calc(100dvh - 24px - var(--safe-b) - var(--safe-t));
+  overflow-y: auto;
   background: var(--panel);
   border: 4px solid var(--brass);
   border-radius: 16px 16px 10px 10px;
@@ -463,22 +479,34 @@ body.rails-right-open .selected-bar {
   font-weight: 800;
   text-transform: uppercase;
 }
-.role-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; }
-.role-pick {
-  min-height: 72px;
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  border: 3px solid currentColor;
-  background: var(--dirt-2);
+.role-select {
+  width: 100%;
+  min-height: 64px;
+  margin: 0 0 14px;
+  padding: 8px 48px 8px 14px;
   font-size: 22px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dust);
+  background-color: #140f0c;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23e8dcc8' d='M4 8l8 10 8-10z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 18px 14px;
+  border: 4px solid var(--edge);
+  border-radius: 12px;
+  appearance: none;
+  -webkit-appearance: none;
 }
-.role-pick svg { width: 72px; height: 48px; }
-.role-pick.on {
-  background: #4a3e24;
-  box-shadow: 0 0 0 3px rgba(245, 213, 71, 0.35);
+.role-select:focus { border-color: var(--brass); outline: none; }
+.role-select.is-on { border-color: var(--brass); background-color: #2a2418; }
+.identity-icon .role-letter,
+.role-letter {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: currentColor; color: #1c1814;
+  font-size: 18px; font-weight: 900;
 }
 .profile-label,
 .profile-section {

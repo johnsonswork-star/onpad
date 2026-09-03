@@ -20,7 +20,7 @@ Add to home screen (PWA) after it is on HTTPS.
 
 ## How to use
 
-1. Allow GPS. The yellow machine marker is **this phone**. Big top bar = **who you are** (Dozer / Excavator / Water). Tap it for **Profile** (optional display name, machine role, **Continue as truck driver** — no login). GPS + LIVE sit under that identity bar. **No job code** — everyone on the Pages URL shares one open site.
+1. Allow GPS. The yellow machine marker is **this phone**. Big top bar = **who you are** (Dozer / Excavator / Water). Tap it for **Profile** (optional name; Operators vs Site crew dropdowns; role-aware Continue — no login). GPS + LIVE sit under that identity bar. **No job code** — everyone on the Pages URL shares one open site.
 2. **Left rail (Machine):** starts closed on phone (edge chevron). Place Dozer / Excavator / Water. Calls: Light / Heavy / Clean. Dozer stakeout: **Pin**, **Undo**, **Cut**.
 3. **Right rail (Site):** Pad / Road / Pile, Map style, Here (recenter).
 4. **Bottom truck bar:** fat **TRUCK PATHS** handle. Open it → **Start** a haul route, tap the map to drop points, **Done** to save, **In** / **Out** to tag follow-road. Paths sync live with the site.

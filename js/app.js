@@ -16,8 +16,24 @@
     road: { w: 8, l: 50, rot: 90 },
     pile: { r: 8 }
   };
-  const ROLES = ['dozer', 'excavator', 'water'];
-  const ROLE_LABEL = { dozer: 'Dozer', excavator: 'Excavator', water: 'Water' };
+  const MACHINE_ROLES = ['dozer', 'excavator', 'water'];
+  const CREW_ROLES = ['survey', 'foreman', 'geology', 'mechanic', 'trucker', 'laborer', 'fuel'];
+  const ROLES = MACHINE_ROLES.concat(CREW_ROLES);
+  const ROLE_LABEL = {
+    dozer: 'Dozer', excavator: 'Excavator', water: 'Water',
+    survey: 'Survey', foreman: 'Foreman', geology: 'Geology',
+    mechanic: 'Mechanic', trucker: 'Trucker', laborer: 'Laborer', fuel: 'Fuel truck'
+  };
+  const ROLE_LETTER = { survey: 'S', foreman: 'F', geology: 'G', mechanic: 'M', trucker: 'T', laborer: 'L', fuel: 'FT' };
+  function isMachineRole(r) { return MACHINE_ROLES.indexOf(r) >= 0; }
+  function isKnownRole(r) { return ROLES.indexOf(r) >= 0; }
+  function continueAsLabel(name) {
+    if (name) return 'Continue as ' + name;
+    if (role === 'trucker') return 'Continue as truck driver';
+    if (role === 'fuel') return 'Continue as fuel truck';
+    if (isMachineRole(role)) return 'Continue as ' + role + ' operator';
+    return 'Continue as ' + role;
+  }
 
   /* ------------------------------------------------------------------ */
   /* Position source                                                      */
@@ -204,6 +220,7 @@
   /* state */
   let state = emptyState(SHARED_SITE);
   let role = localStorage.getItem('onpad:role') || 'dozer';
+  if (!isKnownRole(role)) role = 'dozer';
   let placeTool = null;
   let selected = null; // { kind, id }
   let map, layers, handleGroup, machineMarkers = {}, myMarker, accCircle;
@@ -440,20 +457,23 @@
       btn.className = 'identity role-' + role + (name ? ' named' : '');
       const kicker = btn.querySelector('.identity-kicker');
       const sub = btn.querySelector('.identity-sub');
-      document.getElementById('roleLabel').textContent = ROLE_LABEL[role];
+      document.getElementById('roleLabel').textContent = ROLE_LABEL[role] || role;
       if (name) {
         if (kicker) kicker.textContent = name;
         if (sub) sub.textContent = '';
       } else {
         if (kicker) kicker.textContent = "I'M THE";
-        if (sub) sub.textContent = 'OPERATOR';
+        if (sub) sub.textContent = isMachineRole(role) ? 'OPERATOR' : '';
       }
       const stake = document.getElementById('stakeRow');
       if (stake) stake.style.display = role === 'dozer' ? 'flex' : 'none';
-      document.body.classList.remove('role-dozer', 'role-excavator', 'role-water');
+      ROLES.forEach((r) => document.body.classList.remove('role-' + r));
       document.body.classList.add('role-' + role);
       const ico = document.getElementById('roleIcon');
-      if (ico) ico.innerHTML = roleSvg(role);
+      if (ico) {
+        if (isMachineRole(role)) ico.innerHTML = roleSvg(role);
+        else ico.innerHTML = '<span class="role-letter" aria-hidden="true">' + (ROLE_LETTER[role] || '?') + '</span>';
+      }
     },
     pinCount() {
       const n = (state.stakeDraft.pins || []).length;
@@ -484,16 +504,31 @@
     const input = document.getElementById('displayNameInput');
     if (input && document.activeElement !== input) input.value = name;
     const btn = document.getElementById('continueAsBtn');
-    if (btn) btn.textContent = 'Continue as ' + (name || 'truck driver');
+    if (btn) btn.textContent = continueAsLabel(name);
     const chip = document.getElementById('userIdChip');
     if (chip) {
       const id = localUserId();
       chip.textContent = truncUserId(id);
       chip.setAttribute('title', id);
     }
-    document.querySelectorAll('.role-pick').forEach((b) => {
-      b.classList.toggle('on', b.getAttribute('data-role') === role);
-    });
+    const op = document.getElementById('opRoleSelect');
+    const crew = document.getElementById('crewRoleSelect');
+    if (op) {
+      op.value = isMachineRole(role) ? role : '';
+      op.classList.toggle('is-on', isMachineRole(role));
+    }
+    if (crew) {
+      crew.value = isMachineRole(role) ? '' : role;
+      crew.classList.toggle('is-on', !isMachineRole(role));
+    }
+  }
+  function applyRole(next) {
+    if (!isKnownRole(next)) return;
+    role = next;
+    try { localStorage.setItem('onpad:role', role); } catch (e) {}
+    syncProfileSheet();
+    persist();
+    ui.role();
   }
 
   /* SVG bits */
@@ -1233,7 +1268,7 @@
 
   function drawMachines() {
     const pos = PositionSource.getLatLng();
-    if (pos) {
+    if (pos && isMachineRole(role)) {
       state.machines[role] = { lat: pos.lat, lng: pos.lng, hdg: pos.heading, t: pos.t, accM: pos.accM };
     }
     Object.keys(machineMarkers).forEach((k) => {
@@ -1533,14 +1568,22 @@
     document.querySelectorAll('.sheet').forEach((sh) => {
       sh.addEventListener('click', (e) => { if (e.target === sh) sh.hidden = true; });
     });
-    document.querySelectorAll('.role-pick').forEach((b) => {
-      b.addEventListener('click', () => {
-        role = b.getAttribute('data-role');
-        localStorage.setItem('onpad:role', role);
-        syncProfileSheet();
-        persist();
+    const opSelect = document.getElementById('opRoleSelect');
+    const crewSelect = document.getElementById('crewRoleSelect');
+    if (opSelect) {
+      opSelect.addEventListener('change', () => {
+        const v = opSelect.value;
+        if (v) applyRole(v);
+        else syncProfileSheet();
       });
-    });
+    }
+    if (crewSelect) {
+      crewSelect.addEventListener('change', () => {
+        const v = crewSelect.value;
+        if (v) applyRole(v);
+        else syncProfileSheet();
+      });
+    }
     const nameInput = document.getElementById('displayNameInput');
     if (nameInput) {
       const saveName = () => {
@@ -1553,7 +1596,7 @@
         setDisplayName(nameInput.value);
         const btn = document.getElementById('continueAsBtn');
         const n = displayName();
-        if (btn) btn.textContent = 'Continue as ' + (n || 'truck driver');
+        if (btn) btn.textContent = continueAsLabel(n);
         ui.role();
       });
       nameInput.addEventListener('change', saveName);
