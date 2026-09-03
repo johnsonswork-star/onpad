@@ -579,7 +579,8 @@
     }
     map = L.map('map', {
       zoomControl: false,
-      attributionControl: true
+      attributionControl: true,
+      markerZoomAnimation: false
     });
 
     let prefer = 'sat';
@@ -837,20 +838,7 @@
       const m = L.marker([r.lat, r.lng], { icon: reqIcon(r.kind), draggable: true, zIndexOffset: 400 });
       m.addTo(layers.requests);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'request', id: r.id }); });
-      m.on('dragstart', () => { editLock = true; map.dragging.disable(); });
-      m.on('drag', () => {
-        const ll = m.getLatLng();
-        r.lat = ll.lat; r.lng = ll.lng; r.u = now();
-        localDragWins[r.id] = r.u;
-      });
-      m.on('dragend', () => {
-        const ll = m.getLatLng();
-        r.lat = ll.lat; r.lng = ll.lng; r.u = now();
-        localDragWins[r.id] = r.u;
-        editLock = false;
-        map.dragging.enable();
-        persist();
-      });
+      wirePixelDrag(m, () => state.requests, r.id);
     });
   }
 
@@ -1037,6 +1025,7 @@
     pathDraft.u = now();
     pathDraft = null;
     placeTool = null;
+    selected = null;
     ui.tools();
     ui.pathHint('Path saved · Start another or Clear');
     persist();
@@ -1127,16 +1116,14 @@
           line.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'path', id: p.id }); });
         }
       }
-      // vertices
+      // vertices — CSS-pixel Leaflet icons (do not scale with map zoom)
       p.pts.forEach((pt, i) => {
         const isEnd = i === 0 || i === p.pts.length - 1;
-        L.circleMarker([pt.lat, pt.lng], {
-          radius: isEnd ? 8 : 5,
-          color: '#111',
-          weight: 2,
-          fillColor: p.tag === 'in' ? '#6ec8ff' : p.tag === 'out' ? '#ff9a4a' : '#f5d547',
-          fillOpacity: 1,
-          interactive: false
+        L.marker([pt.lat, pt.lng], {
+          icon: pathVertexIcon(p.tag, isEnd),
+          interactive: false,
+          keyboard: false,
+          zIndexOffset: 350
         }).addTo(layers.paths);
       });
       if (!draft && p.tag && latlngs.length >= 2) {
@@ -1151,6 +1138,37 @@
           })
         }).addTo(layers.paths);
       }
+    });
+  }
+
+  function pathVertexIcon(tag, isEnd) {
+    const size = isEnd ? 20 : 14;
+    const cls = tag === 'in' ? ' tag-in' : tag === 'out' ? ' tag-out' : '';
+    return L.divIcon({
+      className: 'leaflet-div-icon path-vertex' + cls,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2]
+    });
+  }
+
+  function persistDragLatLng(arr, id, ll) {
+    const item = findById(arr || [], id);
+    if (!item) return null;
+    item.lat = ll.lat;
+    item.lng = ll.lng;
+    item.u = now();
+    localDragWins[id] = item.u;
+    return item;
+  }
+
+  function wirePixelDrag(marker, getArr, id) {
+    marker.on('dragstart', () => { editLock = true; map.dragging.disable(); });
+    marker.on('drag', () => { persistDragLatLng(getArr(), id, marker.getLatLng()); });
+    marker.on('dragend', () => {
+      persistDragLatLng(getArr(), id, marker.getLatLng());
+      editLock = false;
+      map.dragging.enable();
+      persist();
     });
   }
 
@@ -1193,20 +1211,7 @@
         draggable: true
       }).addTo(layers.fleet);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
-      m.on('dragstart', () => { editLock = true; map.dragging.disable(); });
-      m.on('drag', () => {
-        const ll = m.getLatLng();
-        f.lat = ll.lat; f.lng = ll.lng; f.u = now();
-        localDragWins[f.id] = f.u;
-      });
-      m.on('dragend', () => {
-        const ll = m.getLatLng();
-        f.lat = ll.lat; f.lng = ll.lng; f.u = now();
-        localDragWins[f.id] = f.u;
-        editLock = false;
-        map.dragging.enable();
-        persist();
-      });
+      wirePixelDrag(m, () => state.fleet, f.id);
     });
   }
 

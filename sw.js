@@ -1,4 +1,4 @@
-/* OnPad service worker — only cache same-origin. Never touch map tiles. */
+/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=12 path-vertex) */
 const CACHE = 'onpad-v12';
 const CORE = [
   './',
