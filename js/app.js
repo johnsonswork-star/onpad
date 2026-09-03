@@ -1061,7 +1061,19 @@
     syncRailBody();
   }
 
+  /* Wide = existing 720px tablet breakpoint, excluding short landscape cab */
+  function railsDefaultOpen() {
+    try {
+      const wide = window.matchMedia('(min-width: 720px)').matches;
+      const cabLandscape = window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+      return wide && !cabLandscape;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function restoreRails() {
+    const preferOpen = railsDefaultOpen();
     ['leftRail', 'rightRail'].forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -1069,7 +1081,11 @@
         const v = localStorage.getItem('onpad:rail:' + id);
         if (v === '0') el.classList.remove('open');
         else if (v === '1') el.classList.add('open');
-      } catch (e) {}
+        else if (preferOpen) el.classList.add('open');
+        // else: leave closed (HTML/CSS phone default — no FOUC of open rails)
+      } catch (e) {
+        if (preferOpen) el.classList.add('open');
+      }
     });
     syncRailBody();
   }
@@ -1232,8 +1248,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v5').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=5')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v6').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=6')).catch(() => {});
   }
 
   function showBootError(msg) {

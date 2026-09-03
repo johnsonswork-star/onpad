@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=5" />
+  <link rel="stylesheet" href="css/app.css?v=6" />
 </head>
 <body>
   <div id="app">
@@ -39,7 +39,7 @@
     </header>
 
     <!-- LEFT: equipment / machine actions -->
-    <aside id="leftRail" class="rail rail-left open" aria-label="Machine tools">
+    <aside id="leftRail" class="rail rail-left" aria-label="Machine tools">
       <div class="rail-panel">
         <div class="rail-section" aria-label="Place machine">
           <span class="rail-label">Machine</span>
@@ -107,12 +107,12 @@
           </button>
         </div>
       </div>
-      <button type="button" id="leftRailHandle" class="rail-handle" aria-label="Hide or show machine tools" aria-controls="leftRail" aria-expanded="true">‹</button>
+      <button type="button" id="leftRailHandle" class="rail-handle" aria-label="Hide or show machine tools" aria-controls="leftRail" aria-expanded="false">›</button>
     </aside>
 
     <!-- RIGHT: map / site surface tools -->
-    <aside id="rightRail" class="rail rail-right open" aria-label="Site tools">
-      <button type="button" id="rightRailHandle" class="rail-handle" aria-label="Hide or show site tools" aria-controls="rightRail" aria-expanded="true">›</button>
+    <aside id="rightRail" class="rail rail-right" aria-label="Site tools">
+      <button type="button" id="rightRailHandle" class="rail-handle" aria-label="Hide or show site tools" aria-controls="rightRail" aria-expanded="false">‹</button>
       <div class="rail-panel">
         <div class="rail-section" id="surfaceRow" aria-label="Surfaces">
           <span class="rail-label">Site</span>
@@ -225,6 +225,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

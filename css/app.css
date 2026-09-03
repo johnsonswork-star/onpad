@@ -183,6 +183,8 @@ body {
   right: var(--safe-r);
   flex-direction: row;
 }
+/* Default closed in HTML (no .open). Phone/cab stay tucked on first paint.
+   Wide (≥720px, not short landscape cab) may get .open from JS when no saved preference. */
 .rail-left:not(.open) { transform: translateX(calc(-1 * var(--rail-w))); }
 .rail-right:not(.open) { transform: translateX(var(--rail-w)); }
 
