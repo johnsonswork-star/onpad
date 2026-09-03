@@ -493,12 +493,12 @@
   /* SVG bits */
   const SVG = {
     shovel: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 2h4v14l6 10a8 8 0 1 1-16 0l6-10z" fill="currentColor"/></svg>',
-    drop: '<svg viewBox="0 0 32 32"><path d="M16 2s10 12 10 18a10 10 0 1 1-20 0C6 14 16 2 16 2z" fill="currentColor"/></svg>',
-    mist: '<svg viewBox="0 0 32 32"><path d="M12 8c0-4 4-8 4-8s4 4 4 8a4 4 0 1 1-8 0z" fill="currentColor"/><circle cx="7" cy="24" r="3" fill="currentColor"/><circle cx="16" cy="28" r="2.2" fill="currentColor"/><circle cx="25" cy="24" r="3" fill="currentColor"/></svg>',
-    blade: '<svg viewBox="0 0 32 32"><path d="M4 20h24l-3 6H7z" fill="currentColor"/><path d="M7 18l3-8h12l3 8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
-    dozer: '<svg viewBox="0 0 32 32"><rect x="4" y="10" width="20" height="10" fill="currentColor"/><rect x="2" y="16" width="10" height="5" fill="currentColor"/><circle cx="10" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
-    excavator: '<svg viewBox="0 0 32 32"><rect x="6" y="12" width="14" height="8" fill="currentColor"/><path d="M20 14l10-8-2 8-6 3" fill="currentColor"/><circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
-    water: '<svg viewBox="0 0 32 32"><rect x="2" y="12" width="10" height="8" fill="currentColor"/><ellipse cx="20" cy="16" rx="9" ry="6" fill="currentColor"/><circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>'
+    drop: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 4c0 0 16 18 16 28a16 16 0 1 1-32 0C8 22 24 4 24 4z" fill="currentColor"/> </svg>',
+    mist: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 6c0 0 8 10 8 16a8 8 0 1 1-16 0c0-6 8-16 8-16z" fill="currentColor"/> <circle cx="10" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="18" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="30" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="38" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="24" cy="42" r="2.2" fill="currentColor" opacity=".55"/> </svg>',
+    blade: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M34 4 L16 30" stroke="currentColor" stroke-width="5" stroke-linecap="round"/> <path d="M4 28 L22 16 L30 30 L8 40 Z" fill="currentColor"/> <path d="M7 36 L3 45 M13 38 L9 46 M19 39 L16 46 M25 37 L25 46" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/> </svg>',
+    dozer: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="10" y="9" width="17" height="9" rx="1.5" fill="currentColor"/> <rect x="19" y="4" width="8" height="7" rx="1.2" fill="currentColor"/> <rect x="1" y="6" width="6" height="15" rx="1" fill="currentColor"/> <rect x="5" y="10" width="6" height="3" fill="currentColor"/> <rect x="8" y="20" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="24" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
+    excavator: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="3" y="12" width="15" height="9" rx="1.5" fill="currentColor"/> <rect x="4" y="6" width="10" height="8" rx="1.2" fill="currentColor"/> <path d="M16 10 L28 4 L29.5 8 L19 13 Z" fill="currentColor"/> <path d="M28 5 L31 16 L27 17.5 L26 8 Z" fill="currentColor"/> <path d="M25 15.5 L32 17 L31 22 L24 19.5 Z" fill="currentColor"/> <rect x="2" y="21" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="7" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="17" cy="24" r="3.5" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
+    water: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="1" y="9" width="9" height="10" rx="1.5" fill="currentColor"/> <path d="M2.5 9 V5.5 h6 V9 Z" fill="currentColor"/> <rect x="9" y="6.5" width="20" height="13" rx="6.5" fill="currentColor"/> <rect x="3" y="20" width="24" height="3" rx=".8" fill="currentColor"/> <circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>'
   };
 
   /* map + layers */
@@ -1609,8 +1609,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v9').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=9')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v10').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=10')).catch(() => {});
   }
 
   function showBootError(msg) {
