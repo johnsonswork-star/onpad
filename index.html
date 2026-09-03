@@ -13,14 +13,14 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=12" />
+  <link rel="stylesheet" href="css/app.css?v=13" />
 </head>
 <body>
   <div id="app">
     <div id="map" role="application" aria-label="Jobsite satellite map"></div>
 
     <header id="topbar">
-      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Profile and machine role">
+      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Profile and role">
         <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
         <span class="identity-copy">
           <span class="identity-kicker">I'M THE</span>
@@ -201,23 +201,26 @@
       <h2>Profile</h2>
       <label class="profile-label" for="displayNameInput">Display name</label>
       <input id="displayNameInput" class="name-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Optional" enterkeyhint="done" />
-      <h3 class="profile-section">Default machine</h3>
-      <div class="role-grid">
-        <button type="button" class="role-pick role-dozer" data-role="dozer">
-          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="8" y="18" width="40" height="14" rx="2" fill="currentColor"/><rect x="4" y="28" width="18" height="6" fill="currentColor"/><circle cx="18" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="42" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
-          <span>Dozer</span>
-        </button>
-        <button type="button" class="role-pick role-excavator" data-role="excavator">
-          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="18" y="22" width="28" height="12" rx="2" fill="currentColor"/><path d="M44 24l16-10-4 10-8 4" fill="currentColor"/><circle cx="28" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="46" cy="38" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
-          <span>Excavator</span>
-        </button>
-        <button type="button" class="role-pick role-water" data-role="water">
-          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="6" y="20" width="18" height="12" rx="2" fill="currentColor"/><ellipse cx="40" cy="26" rx="16" ry="10" fill="currentColor"/><circle cx="16" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="42" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
-          <span>Water</span>
-        </button>
-      </div>
+      <label class="profile-label" for="opRoleSelect">Operators</label>
+      <select id="opRoleSelect" class="role-select" aria-label="Machine operator">
+        <option value="">Not an operator</option>
+        <option value="dozer">Dozer</option>
+        <option value="excavator">Excavator</option>
+        <option value="water">Water</option>
+      </select>
+      <label class="profile-label" for="crewRoleSelect">Site crew</label>
+      <select id="crewRoleSelect" class="role-select" aria-label="Site crew">
+        <option value="">Not site crew</option>
+        <option value="survey">Survey</option>
+        <option value="foreman">Foreman</option>
+        <option value="geology">Geology</option>
+        <option value="mechanic">Mechanic</option>
+        <option value="trucker">Trucker</option>
+        <option value="laborer">Laborer</option>
+        <option value="fuel">Fuel truck</option>
+      </select>
       <div class="profile-stub">
-        <button type="button" id="continueAsBtn" class="fat primary">Continue as Guest</button>
+        <button type="button" id="continueAsBtn" class="fat primary">Continue as dozer operator</button>
         <span id="userIdChip" class="userid-chip" title="Anonymous id"></span>
       </div>
       <p class="hint profile-hint">No login. Rename keeps this same id.</p>
@@ -247,6 +250,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/app.js?v=13"></script>
 </body>
 </html>
