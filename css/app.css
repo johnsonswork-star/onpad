@@ -24,7 +24,7 @@
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --topbar-h: 108px;
+  --topbar-h: 96px;
   --rail-w: 92px;
   --touch: 68px;
 }
@@ -84,11 +84,11 @@ body {
   color: var(--dozer);
 }
 .identity-icon {
-  width: 48px; height: 48px;
-  flex: 0 0 48px;
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
   display: flex; align-items: center; justify-content: center;
 }
-.identity-icon svg { width: 48px; height: 48px; display: block; }
+.identity-icon svg { width: 32px; height: 32px; display: block; }
 .identity-copy {
   display: flex;
   flex-direction: column;
@@ -168,7 +168,7 @@ body {
 .rail {
   position: absolute;
   top: calc(var(--topbar-h) + var(--safe-t));
-  bottom: calc(8px + var(--safe-b));
+  bottom: calc(56px + var(--safe-b));
   z-index: 500;
   display: flex;
   pointer-events: none;
@@ -272,7 +272,7 @@ body {
   font-weight: 800;
   letter-spacing: 0.04em;
 }
-.tool svg { width: 30px; height: 30px; display: block; }
+.tool svg { width: 48px; height: 48px; display: block; }
 .tool.active {
   border-color: var(--safety);
   background: #4a3e24;
@@ -308,12 +308,12 @@ body {
   line-height: 20px;
 }
 
-/* Selected bar — floats over map, clear of rails when open */
+/* Selected bar — floats over map, clear of rails + truck handle */
 .selected-bar {
   position: absolute;
   left: calc(8px + var(--safe-l));
   right: calc(8px + var(--safe-r));
-  bottom: calc(12px + var(--safe-b));
+  bottom: calc(64px + var(--safe-b));
   z-index: 480;
   display: flex;
   align-items: center;
@@ -481,6 +481,136 @@ body.rails-right-open .selected-bar {
 button { font: inherit; cursor: pointer; color: inherit; }
 button:active { transform: translateY(1px); }
 
+
+/* ========== BOTTOM TRUCK BAR ========== */
+:root {
+  --truck-handle-h: 52px;
+  --truck-panel-h: 148px;
+}
+.truck-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 510;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  transition: transform 0.22s ease;
+}
+.truck-bar > * { pointer-events: auto; }
+.truck-bar:not(.open) {
+  transform: translateY(var(--truck-panel-h));
+}
+.truck-handle {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: var(--truck-handle-h);
+  min-width: min(92vw, 420px);
+  margin: 0 8px;
+  padding: 8px 16px calc(8px + var(--safe-b));
+  border: 4px solid var(--brass);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, #3a3228, #2a231c);
+  color: var(--safety);
+  box-shadow: 0 -4px 0 #00000066;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.truck-handle-grip {
+  position: absolute;
+  top: 6px;
+  width: 48px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--edge);
+}
+.truck-handle { position: relative; padding-top: 14px; }
+.truck-handle-icon {
+  width: 36px; height: 36px;
+  flex: 0 0 36px;
+  color: var(--safety);
+}
+.truck-handle-icon svg { width: 36px; height: 36px; display: block; }
+.truck-handle-label {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--dust);
+}
+.truck-handle-chevron {
+  font-size: 18px;
+  color: var(--safety);
+  margin-left: 4px;
+}
+.truck-bar.open .truck-handle-chevron { transform: rotate(180deg); }
+.truck-panel {
+  height: var(--truck-panel-h);
+  padding: 8px 10px 10px;
+  padding-bottom: calc(10px + var(--safe-b));
+  background: linear-gradient(180deg, #322a22f2, #1c1814f5);
+  border-top: 3px solid var(--brass);
+  box-shadow: 0 -6px 24px #000a;
+}
+.truck-tools {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+}
+.truck-tools::-webkit-scrollbar { display: none; }
+.truck-tools .tool {
+  flex: 0 0 76px;
+  width: 76px;
+  min-height: 84px;
+}
+.tool-truck { color: var(--safety); }
+.tool-truck.tool-path-tag { color: #9ad0ff; }
+.tool-truck.active { color: var(--safety); }
+.truck-hint {
+  margin: 4px 4px 0;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+body.truck-open .selected-bar {
+  bottom: calc(var(--truck-handle-h) + var(--truck-panel-h) + 12px + var(--safe-b));
+}
+body.truck-open .rail {
+  bottom: calc(var(--truck-handle-h) + var(--truck-panel-h) + 8px + var(--safe-b));
+}
+
+/* Path polylines are Leaflet paths; draft vertex markers */
+.path-tag-label {
+  background: #1c1814ee;
+  border: 2px solid var(--safety);
+  color: var(--safety);
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.path-vertex {
+  width: 18px; height: 18px;
+  margin-left: -9px; margin-top: -9px;
+  border-radius: 50%;
+  background: var(--safety);
+  border: 3px solid #111;
+  box-shadow: 0 2px 0 #0008;
+}
+
 /* Map overlays */
 .surface-label {
   background: none; border: 0; box-shadow: none;
@@ -605,6 +735,6 @@ button:active { transform: translateY(1px); }
 @media (min-width: 720px) and (orientation: portrait) {
   :root { --rail-w: 110px; --touch: 76px; }
   .tool { font-size: 13px; }
-  .tool svg { width: 34px; height: 34px; }
+  .tool svg { width: 48px; height: 48px; }
   .identity-role { font-size: 34px; }
 }

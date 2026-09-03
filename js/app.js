@@ -1,8 +1,9 @@
-/* OnPad v1 — jobsite map for dozer / excavator / water truck */
+/* OnPad — open jobsite map for dozer / excavator / water / truck */
 (() => {
   'use strict';
 
   const VERSION = 1;
+  const SHARED_SITE = 'SITE'; /* one shared live room for the Pages URL — no job codes */
   const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const M_PER_DEG = 111320;
   const FT_PER_M = 3.28084;
@@ -146,7 +147,7 @@
   }
 
   /* state */
-  let state = emptyState(jobCode());
+  let state = emptyState(SHARED_SITE);
   let role = localStorage.getItem('onpad:role') || 'dozer';
   let placeTool = null;
   let selected = null; // { kind, id }
@@ -157,15 +158,18 @@
   let applyingRemote = false;
   let didFly = false;
   let lastLocalView = null;
+  let pathDraft = null;
+  let pathTagPending = null;
 
   function emptyState(code) {
     return {
       v: VERSION,
-      job: code,
+      job: code || SHARED_SITE,
       surfaces: [],
       requests: [],
       digPads: [],
       fleet: [],
+      paths: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
       u: now()
@@ -192,6 +196,7 @@
         const s = JSON.parse(raw);
         if (s && s.v === VERSION) {
           if (!Array.isArray(s.fleet)) s.fleet = [];
+          if (!Array.isArray(s.paths)) s.paths = [];
           return s;
         }
       }
@@ -207,6 +212,7 @@
       requests: state.requests,
       digPads: state.digPads,
       fleet: state.fleet || [],
+      paths: state.paths || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
       u: state.u
@@ -224,12 +230,15 @@
   }
 
   function applyRemote(remote) {
-    if (!remote || remote.v !== VERSION || remote.job !== state.job) return;
+    if (!remote || remote.v !== VERSION) return;
+    /* open site: accept payloads for this room; ignore foreign rooms */
+    if (remote.job && remote.job !== state.job) return;
     applyingRemote = true;
     state.surfaces = mergeById(state.surfaces, remote.surfaces);
     state.requests = mergeById(state.requests, remote.requests);
     state.digPads = mergeById(state.digPads, remote.digPads);
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
+    state.paths = mergeById(state.paths || [], remote.paths || []);
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
     const lu = (state.stakeDraft && state.stakeDraft.u) || 0;
     if (ru >= lu) state.stakeDraft = remote.stakeDraft || { pins: [], u: 0 };
@@ -261,14 +270,13 @@
   }
   function shareUrl() {
     const u = new URL(location.href);
-    u.searchParams.set('job', state.job);
-    const snap = encodeSnap();
-    u.hash = snap ? ('s=' + snap) : '';
+    u.searchParams.delete('job');
+    u.hash = '';
     return u.toString();
   }
 
-  /* MQTT sync — public brokers, job code is the room. No API keys. */
-  function topic() { return 'onpad/v1/' + state.job; }
+  /* MQTT sync — public brokers; shared site room (hidden). No API keys. */
+  function topic() { return 'onpad/v1/' + (state.job || SHARED_SITE); }
   function schedulePub() {
     if (applyingRemote) return;
     clearTimeout(pubTimer);
@@ -360,9 +368,10 @@
       else if (mode === 'wait') { el.className = 'badge sync-wait'; el.textContent = 'SYNC'; }
       else { el.className = 'badge sync-local'; el.textContent = 'SOLO'; }
     },
-    job() {
-      document.getElementById('jobCodeLabel').textContent = state.job;
-      document.getElementById('jobHuge').textContent = state.job;
+    job() { /* open site — no job chip in HUD */ },
+    pathHint(msg) {
+      const el = document.getElementById('pathHint');
+      if (el) el.textContent = msg || 'Start a path, tap the map to drop haul points';
     },
     role() {
       const btn = document.getElementById('roleBtn');
@@ -385,6 +394,11 @@
       document.querySelectorAll('.tool[data-tool]').forEach((b) => {
         b.classList.toggle('active', b.getAttribute('data-tool') === placeTool);
       });
+      const drawing = placeTool === 'path-draw' || placeTool === 'path-point' || !!pathDraft;
+      const ps = document.getElementById('pathStartBtn');
+      const pp = document.getElementById('pathPointBtn');
+      if (ps) ps.classList.toggle('active', placeTool === 'path-draw' || (!!pathDraft && placeTool !== 'path-point'));
+      if (pp) pp.classList.toggle('active', placeTool === 'path-point');
     }
   };
 
@@ -394,12 +408,12 @@
   /* SVG bits */
   const SVG = {
     shovel: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 2h4v14l6 10a8 8 0 1 1-16 0l6-10z" fill="currentColor"/></svg>',
-    drop: '<svg viewBox="0 0 32 32"><path d="M16 2s10 12 10 18a10 10 0 1 1-20 0C6 14 16 2 16 2z" fill="currentColor"/></svg>',
-    mist: '<svg viewBox="0 0 32 32"><path d="M12 8c0-4 4-8 4-8s4 4 4 8a4 4 0 1 1-8 0z" fill="currentColor"/><circle cx="7" cy="24" r="3" fill="currentColor"/><circle cx="16" cy="28" r="2.2" fill="currentColor"/><circle cx="25" cy="24" r="3" fill="currentColor"/></svg>',
-    blade: '<svg viewBox="0 0 32 32"><path d="M4 20h24l-3 6H7z" fill="currentColor"/><path d="M7 18l3-8h12l3 8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
-    dozer: '<svg viewBox="0 0 32 32"><rect x="4" y="10" width="20" height="10" fill="currentColor"/><rect x="2" y="16" width="10" height="5" fill="currentColor"/><circle cx="10" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
-    excavator: '<svg viewBox="0 0 32 32"><rect x="6" y="12" width="14" height="8" fill="currentColor"/><path d="M20 14l10-8-2 8-6 3" fill="currentColor"/><circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
-    water: '<svg viewBox="0 0 32 32"><rect x="2" y="12" width="10" height="8" fill="currentColor"/><ellipse cx="20" cy="16" rx="9" ry="6" fill="currentColor"/><circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>'
+    drop: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 4c0 0 16 18 16 28a16 16 0 1 1-32 0C8 22 24 4 24 4z" fill="currentColor"/> </svg>',
+    mist: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 6c0 0 8 10 8 16a8 8 0 1 1-16 0c0-6 8-16 8-16z" fill="currentColor"/> <circle cx="10" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="18" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="30" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="38" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="24" cy="42" r="2.2" fill="currentColor" opacity=".55"/> </svg>',
+    blade: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M34 4 L16 30" stroke="currentColor" stroke-width="5" stroke-linecap="round"/> <path d="M4 28 L22 16 L30 30 L8 40 Z" fill="currentColor"/> <path d="M7 36 L3 45 M13 38 L9 46 M19 39 L16 46 M25 37 L25 46" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/> </svg>',
+    dozer: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="10" y="9" width="17" height="9" rx="1.5" fill="currentColor"/> <rect x="19" y="4" width="8" height="7" rx="1.2" fill="currentColor"/> <rect x="1" y="6" width="6" height="15" rx="1" fill="currentColor"/> <rect x="5" y="10" width="6" height="3" fill="currentColor"/> <rect x="8" y="20" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="24" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
+    excavator: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="3" y="12" width="15" height="9" rx="1.5" fill="currentColor"/> <rect x="4" y="6" width="10" height="8" rx="1.2" fill="currentColor"/> <path d="M16 10 L28 4 L29.5 8 L19 13 Z" fill="currentColor"/> <path d="M28 5 L31 16 L27 17.5 L26 8 Z" fill="currentColor"/> <path d="M25 15.5 L32 17 L31 22 L24 19.5 Z" fill="currentColor"/> <rect x="2" y="21" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="7" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="17" cy="24" r="3.5" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
+    water: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="1" y="9" width="9" height="10" rx="1.5" fill="currentColor"/> <path d="M2.5 9 V5.5 h6 V9 Z" fill="currentColor"/> <rect x="9" y="6.5" width="20" height="13" rx="6.5" fill="currentColor"/> <rect x="3" y="20" width="24" height="3" rx=".8" fill="currentColor"/> <circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>'
   };
 
   /* map + layers */
@@ -437,10 +451,11 @@
     }
     const btn = document.getElementById('basemapBtn');
     if (btn) {
-      const label = kind === 'sat' ? 'MAP' : 'SAT';
-      const span = btn.querySelector('.tool-text-only');
-      if (span) span.textContent = label;
-      else btn.textContent = label;
+      const span = btn.querySelector('span:not(.tool-text-only)');
+      // keep icon; optional tiny label
+      const lab = btn.querySelector('span:last-of-type');
+      if (lab && !lab.querySelector('svg')) lab.textContent = kind === 'sat' ? 'Map' : 'Sat';
+      btn.setAttribute('aria-label', kind === 'sat' ? 'Switch to street map' : 'Switch to satellite');
     }
     try { localStorage.setItem('onpad:basemap', kind); } catch (e) {}
   }
@@ -483,6 +498,7 @@
     layers = {
       surfaces: L.layerGroup().addTo(map),
       requests: L.layerGroup().addTo(map),
+      paths: L.layerGroup().addTo(map),
       stake: L.layerGroup().addTo(map),
       dig: L.layerGroup().addTo(map),
       fleet: L.layerGroup().addTo(map),
@@ -502,7 +518,7 @@
       try { localStorage.setItem('onpad:view', JSON.stringify(lastLocalView)); } catch (e) {}
     });
 
-    ['topbar', 'leftRail', 'rightRail', 'selectedBar'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -517,6 +533,10 @@
   }
 
   function onMapClick(e) {
+    if (placeTool === 'path-draw' || placeTool === 'path-point') {
+      addPathPoint(e.latlng);
+      return;
+    }
     if (placeTool === 'pad' || placeTool === 'road' || placeTool === 'pile') {
       placeSurface(placeTool, e.latlng);
       placeTool = null;
@@ -841,6 +861,181 @@
   }
 
 
+
+  /* haul paths — truck bar */
+  // pathDraft / pathTagPending declared with state above
+
+  function ensurePaths() {
+    if (!Array.isArray(state.paths)) state.paths = [];
+  }
+
+  function startPathDraft() {
+    ensurePaths();
+    pathDraft = { id: uid(), pts: [], tag: pathTagPending || null, u: now() };
+    placeTool = 'path-draw';
+    ui.tools();
+    ui.pathHint('Tap map to drop haul points · Done when finished');
+    ui.toast('Path started — tap map');
+    openTruckBar(true);
+  }
+
+  function addPathPoint(latlng) {
+    if (!pathDraft) startPathDraft();
+    pathDraft.pts.push({ lat: latlng.lat, lng: latlng.lng });
+    pathDraft.u = now();
+    drawPaths();
+    ui.pathHint('Points: ' + pathDraft.pts.length + ' · tap more or Done');
+  }
+
+  function undoPathPoint() {
+    if (pathDraft && pathDraft.pts.length) {
+      pathDraft.pts.pop();
+      drawPaths();
+      ui.pathHint(pathDraft.pts.length ? ('Points: ' + pathDraft.pts.length) : 'Tap map to drop haul points');
+      return;
+    }
+    ensurePaths();
+    // undo last committed path point / remove last path if empty undo
+    const live = state.paths.filter((p) => !p.gone);
+    if (!live.length) { ui.toast('No path points'); return; }
+    const last = live[live.length - 1];
+    if (last.pts && last.pts.length > 2) {
+      last.pts = last.pts.slice(0, -1);
+      last.u = now();
+      persist();
+      ui.toast('Point removed');
+    } else {
+      last.gone = true;
+      last.u = now();
+      persist();
+      ui.toast('Path cleared');
+    }
+  }
+
+  function finishPath() {
+    if (!pathDraft || pathDraft.pts.length < 2) {
+      ui.toast('Need 2+ points');
+      return;
+    }
+    ensurePaths();
+    if (pathTagPending) pathDraft.tag = pathTagPending;
+    state.paths.push({
+      id: pathDraft.id,
+      pts: pathDraft.pts.slice(),
+      tag: pathDraft.tag || null,
+      u: now()
+    });
+    pathDraft = null;
+    placeTool = null;
+    ui.tools();
+    ui.pathHint('Path saved · Start another or Clear');
+    persist();
+    ui.toast('Haul path saved');
+  }
+
+  function clearPaths() {
+    ensurePaths();
+    if (pathDraft) {
+      pathDraft = null;
+      placeTool = null;
+      ui.tools();
+      drawPaths();
+      ui.pathHint('Draft cleared');
+      ui.toast('Draft cleared');
+      return;
+    }
+    const live = state.paths.filter((p) => !p.gone);
+    if (!live.length) { ui.toast('No paths'); return; }
+    if (selected && selected.kind === 'path') {
+      const p = findById(state.paths, selected.id);
+      if (p) { p.gone = true; p.u = now(); selected = null; persist(); ui.toast('Path removed'); return; }
+    }
+    live.forEach((p) => { p.gone = true; p.u = now(); });
+    persist();
+    ui.pathHint('All paths cleared');
+    ui.toast('Paths cleared');
+  }
+
+  function setPathTag(tag) {
+    pathTagPending = pathTagPending === tag ? null : tag;
+    document.querySelectorAll('.tool-path-tag').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-path-tag') === pathTagPending);
+    });
+    if (pathDraft) {
+      pathDraft.tag = pathTagPending;
+      drawPaths();
+    } else if (selected && selected.kind === 'path') {
+      const p = findById(state.paths, selected.id);
+      if (p) {
+        p.tag = pathTagPending;
+        p.u = now();
+        persist();
+      }
+    }
+    ui.toast(pathTagPending === 'in' ? 'Tag: ROAD IN' : pathTagPending === 'out' ? 'Tag: ROAD OUT' : 'Tag cleared');
+    ui.pathHint(pathTagPending === 'in' ? 'Next path = follow road IN' : pathTagPending === 'out' ? 'Next path = follow road OUT' : 'Start a path, tap the map to drop haul points');
+  }
+
+  function pathStyle(tag, on, draft) {
+    let color = '#f5d547';
+    if (tag === 'in') color = '#6ec8ff';
+    if (tag === 'out') color = '#ff9a4a';
+    return {
+      color,
+      weight: on || draft ? 10 : 8,
+      opacity: draft ? 0.75 : 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+      dashArray: draft ? '10 12' : null
+    };
+  }
+
+  function drawPaths() {
+    if (!layers || !layers.paths) return;
+    layers.paths.clearLayers();
+    ensurePaths();
+    const all = state.paths.slice();
+    if (pathDraft && pathDraft.pts.length) {
+      all.push(Object.assign({ _draft: true }, pathDraft));
+    }
+    all.forEach((p) => {
+      if (p.gone || !p.pts || p.pts.length < 1) return;
+      const on = selected && selected.kind === 'path' && selected.id === p.id;
+      const latlngs = p.pts.map((pt) => [pt.lat, pt.lng]);
+      if (latlngs.length >= 2) {
+        const line = L.polyline(latlngs, Object.assign({ interactive: !p._draft }, pathStyle(p.tag, on, p._draft)));
+        line.addTo(layers.paths);
+        if (!p._draft) {
+          line.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'path', id: p.id }); });
+        }
+      }
+      // vertices
+      p.pts.forEach((pt, i) => {
+        const isEnd = i === 0 || i === p.pts.length - 1;
+        L.circleMarker([pt.lat, pt.lng], {
+          radius: isEnd ? 8 : 5,
+          color: '#111',
+          weight: 2,
+          fillColor: p.tag === 'in' ? '#6ec8ff' : p.tag === 'out' ? '#ff9a4a' : '#f5d547',
+          fillOpacity: 1,
+          interactive: false
+        }).addTo(layers.paths);
+      });
+      if (!p._draft && p.tag && latlngs.length >= 2) {
+        const mid = latlngs[(latlngs.length / 2) | 0];
+        L.marker(mid, {
+          interactive: false,
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="path-tag-label">' + (p.tag === 'in' ? 'IN' : 'OUT') + '</div>',
+            iconSize: [48, 24],
+            iconAnchor: [24, 12]
+          })
+        }).addTo(layers.paths);
+      }
+    });
+  }
+
   /* fleet — manually placed machine markers (not GPS "me") */
   function placeFleet(kind, latlng) {
     if (!state.fleet) state.fleet = [];
@@ -960,6 +1155,7 @@
     selected = sel;
     drawSurfaces();
     drawRequests();
+    drawPaths();
     drawDigPads();
     drawFleet();
     const bar = document.getElementById('selectedBar');
@@ -996,6 +1192,12 @@
       if (!f) { bar.hidden = true; return; }
       meta.innerHTML = roleSvg(f.role) + '<span>' + (ROLE_LABEL[f.role] || f.role).toUpperCase() + '</span>';
       acts.appendChild(killBtn(() => removeItem(state.fleet, f)));
+    } else if (sel.kind === 'path') {
+      const p = findById(state.paths || [], sel.id);
+      if (!p) { bar.hidden = true; return; }
+      const tag = p.tag === 'in' ? ' IN' : p.tag === 'out' ? ' OUT' : '';
+      meta.innerHTML = '<span>HAUL' + tag + ' · ' + (p.pts || []).length + ' pts</span>';
+      acts.appendChild(killBtn(() => removeItem(state.paths, p)));
     }
   }
 
@@ -1024,6 +1226,7 @@
     if (!map) return;
     drawSurfaces();
     drawRequests();
+    drawPaths();
     drawStake();
     drawDigPads();
     drawFleet();
@@ -1036,10 +1239,13 @@
   function syncRailBody() {
     const left = document.getElementById('leftRail');
     const right = document.getElementById('rightRail');
+    const truck = document.getElementById('truckBar');
     document.body.classList.toggle('rails-left-open', !!(left && left.classList.contains('open')));
     document.body.classList.toggle('rails-right-open', !!(right && right.classList.contains('open')));
+    document.body.classList.toggle('truck-open', !!(truck && truck.classList.contains('open')));
     const lh = document.getElementById('leftRailHandle');
     const rh = document.getElementById('rightRailHandle');
+    const th = document.getElementById('truckBarHandle');
     if (lh && left) {
       const open = left.classList.contains('open');
       lh.textContent = open ? '‹' : '›';
@@ -1050,7 +1256,22 @@
       rh.textContent = open ? '›' : '‹';
       rh.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
+    if (th && truck) {
+      const open = truck.classList.contains('open');
+      th.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const chev = document.getElementById('truckHandleChevron');
+      if (chev) chev.textContent = open ? '▼' : '▲';
+    }
     setTimeout(refreshMapSize, 240);
+  }
+
+  function openTruckBar(forceOpen) {
+    const el = document.getElementById('truckBar');
+    if (!el) return;
+    if (forceOpen) el.classList.add('open');
+    else el.classList.toggle('open');
+    try { localStorage.setItem('onpad:rail:truckBar', el.classList.contains('open') ? '1' : '0'); } catch (e) {}
+    syncRailBody();
   }
 
   function toggleRail(id) {
@@ -1087,12 +1308,40 @@
         if (preferOpen) el.classList.add('open');
       }
     });
+    const truck = document.getElementById('truckBar');
+    if (truck) {
+      try {
+        const v = localStorage.getItem('onpad:rail:truckBar');
+        // default collapsed; only open if user previously opened
+        if (v === '1') truck.classList.add('open');
+        else truck.classList.remove('open');
+      } catch (e) {
+        truck.classList.remove('open');
+      }
+    }
     syncRailBody();
   }
 
   function bind() {
-    document.getElementById('jobBtn').addEventListener('click', () => openSheet('jobSheet'));
     document.getElementById('roleBtn').addEventListener('click', () => openSheet('roleSheet'));
+    const truckHandle = document.getElementById('truckBarHandle');
+    if (truckHandle) truckHandle.addEventListener('click', () => openTruckBar());
+    const pathStart = document.getElementById('pathStartBtn');
+    if (pathStart) pathStart.addEventListener('click', () => startPathDraft());
+    const pathPoint = document.getElementById('pathPointBtn');
+    if (pathPoint) pathPoint.addEventListener('click', () => {
+      if (!pathDraft) startPathDraft();
+      else { placeTool = 'path-point'; ui.tools(); ui.toast('Tap map to drop a point'); }
+    });
+    const pathDone = document.getElementById('pathDoneBtn');
+    if (pathDone) pathDone.addEventListener('click', finishPath);
+    const pathUndo = document.getElementById('pathUndoBtn');
+    if (pathUndo) pathUndo.addEventListener('click', undoPathPoint);
+    const pathClear = document.getElementById('pathClearBtn');
+    if (pathClear) pathClear.addEventListener('click', clearPaths);
+    document.querySelectorAll('.tool-path-tag').forEach((b) => {
+      b.addEventListener('click', () => setPathTag(b.getAttribute('data-path-tag')));
+    });
     document.getElementById('basemapBtn').addEventListener('click', () => {
       setBasemap(activeBasemap === 'sat' ? 'street' : 'sat');
     });
@@ -1121,7 +1370,9 @@
             pile: 'Tap map to put a pile',
             'water-light': 'Tap map for light spray',
             'water-heavy': 'Tap map for heavy water',
-            cleanup: 'Tap map for cleanup'
+            cleanup: 'Tap map for cleanup',
+            'path-draw': 'Tap map to drop haul points',
+            'path-point': 'Tap map to drop a point'
           };
           if (tip[placeTool]) ui.toast(tip[placeTool]);
         }
@@ -1148,38 +1399,7 @@
         persist();
       });
     });
-    document.getElementById('newJobBtn').addEventListener('click', () => {
-      switchJob(jobCode(), emptyState);
-      closeSheet('jobSheet');
-      ui.toast('New job ' + state.job);
-    });
-    document.getElementById('joinJobBtn').addEventListener('click', () => {
-      closeSheet('jobSheet');
-      document.getElementById('joinInput').value = '';
-      openSheet('joinSheet');
-      document.getElementById('joinInput').focus();
-    });
-    document.getElementById('joinGoBtn').addEventListener('click', () => {
-      const code = (document.getElementById('joinInput').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-      if (code.length < 3) { ui.toast('Enter a job code'); return; }
-      switchJob(code);
-      closeSheet('joinSheet');
-      ui.toast('Joined ' + state.job);
-    });
-    document.getElementById('copyJobBtn').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(state.job); ui.toast('Copied ' + state.job); }
-      catch (e) { ui.toast(state.job); }
-    });
-    document.getElementById('shareJobBtn').addEventListener('click', async () => {
-      const url = shareUrl();
-      try {
-        if (navigator.share) await navigator.share({ title: 'OnPad ' + state.job, url, text: 'Job ' + state.job });
-        else { await navigator.clipboard.writeText(url); ui.toast('Link copied'); }
-      } catch (e) {
-        try { await navigator.clipboard.writeText(url); ui.toast('Link copied'); }
-        catch (e2) { ui.toast(url); }
-      }
-    });
+    /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
       b.addEventListener('click', () => {
         document.getElementById('cutInput').value = b.getAttribute('data-cut');
@@ -1197,32 +1417,44 @@
   function switchJob(code, factory) {
     persist();
     state = factory ? factory(code) : loadJob(code, emptyState(code));
-    state.job = code;
+    state.job = code || SHARED_SITE;
     selected = null;
     placeTool = null;
+    pathDraft = null;
     if (!Array.isArray(state.fleet)) state.fleet = [];
+    if (!Array.isArray(state.paths)) state.paths = [];
     machineMarkers = {};
     accCircle = null;
     const u = new URL(location.href);
-    u.searchParams.set('job', code);
+    u.searchParams.delete('job');
     history.replaceState(null, '', u.pathname + u.search);
     persist();
     retopic();
   }
 
   function bootFromUrl() {
+    /* Open site: everyone joining the Pages URL shares one pad (SITE).
+       Optional ?job= still works for power users but is never shown in the HUD. */
     const u = new URL(location.href);
-    const q = (u.searchParams.get('job') || '').toUpperCase();
+    const q = (u.searchParams.get('job') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     const hash = (u.hash || '').replace(/^#/, '');
     let snap = null;
     if (hash.startsWith('s=')) snap = decodeSnap(hash.slice(2));
-    const last = localStorage.getItem('onpad:activeJob');
-    let code = q || (snap && snap.job) || last || jobCode();
+    const code = q || SHARED_SITE;
     state = loadJob(code, emptyState(code));
-    if (snap && snap.job === code) applyRemote(snap);
-    else if (snap && !q) {
-      state = snap;
-      state.job = snap.job || code;
+    state.job = code;
+    if (!Array.isArray(state.paths)) state.paths = [];
+    if (snap) {
+      if (snap.job && snap.job !== code && q) {
+        /* ignore mismatched snap when forcing a job */
+      } else {
+        applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
+      }
+    }
+    /* strip legacy job codes from the URL so drivers see a clean link */
+    if (u.searchParams.has('job') || u.hash) {
+      u.searchParams.delete('job');
+      history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : ''));
     }
     try {
       lastLocalView = JSON.parse(localStorage.getItem('onpad:view') || 'null');
@@ -1248,8 +1480,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v6').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=6')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v7').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=7')).catch(() => {});
   }
 
   function showBootError(msg) {
