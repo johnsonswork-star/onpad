@@ -20,7 +20,7 @@
     <div id="map" role="application" aria-label="Jobsite satellite map"></div>
 
     <header id="topbar">
-      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Machine role">
+      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Profile and machine role">
         <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
         <span class="identity-copy">
           <span class="identity-kicker">I'M THE</span>
@@ -195,10 +195,13 @@
     <div id="toast" class="toast" hidden></div>
   </div>
 
-  <!-- Role sheet -->
+  <!-- Profile sheet — same entry as role (#roleBtn). No second nav. -->
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
-      <h2>Machine</h2>
+      <h2>Profile</h2>
+      <label class="profile-label" for="displayNameInput">Display name</label>
+      <input id="displayNameInput" class="name-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Optional" enterkeyhint="done" />
+      <h3 class="profile-section">Default machine</h3>
       <div class="role-grid">
         <button type="button" class="role-pick role-dozer" data-role="dozer">
           <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="8" y="18" width="40" height="14" rx="2" fill="currentColor"/><rect x="4" y="28" width="18" height="6" fill="currentColor"/><circle cx="18" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="42" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
@@ -213,6 +216,11 @@
           <span>Water</span>
         </button>
       </div>
+      <div class="profile-stub">
+        <button type="button" id="continueAsBtn" class="fat primary">Continue as Guest</button>
+        <span id="userIdChip" class="userid-chip" title="Anonymous id"></span>
+      </div>
+      <p class="hint profile-hint">No login. Rename keeps this same id.</p>
       <button type="button" class="sheet-close" data-close="roleSheet">Close</button>
     </div>
   </div>
