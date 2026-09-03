@@ -51,10 +51,17 @@ body {
   font-size: 10px;
   font-weight: 600;
   max-width: 55vw;
+  margin: 0 6px 4px 0 !important;
 }
 .leaflet-control-attribution a { color: #c4b49a !important; }
 .leaflet-control-zoom { display: none; }
-.leaflet-bottom { bottom: calc(var(--truck-handle-h, 58px) + 6px + var(--safe-b)); }
+/* Sit above truck handle + selected-bar slot so attribution never covers controls */
+.leaflet-bottom {
+  bottom: calc(var(--truck-handle-h, 58px) + 72px + var(--safe-b));
+}
+body.truck-open .leaflet-bottom {
+  bottom: calc(var(--truck-handle-h) + var(--truck-panel-h) + 72px + var(--safe-b));
+}
 
 /* ========== TOP IDENTITY BAR ========== */
 #topbar {
@@ -338,6 +345,10 @@ body {
   box-shadow: var(--shadow);
   transition: left 0.22s ease, right 0.22s ease;
 }
+/* display:flex above overrides UA [hidden] — same trap as .sheet */
+.selected-bar[hidden] {
+  display: none !important;
+}
 body.rails-left-open .selected-bar {
   left: calc(var(--rail-w) + 36px + var(--safe-l));
 }
@@ -551,7 +562,7 @@ button:active { transform: translateY(1px); }
 /* ========== BOTTOM TRUCK BAR ========== */
 :root {
   --truck-handle-h: 58px;
-  --truck-panel-h: 156px;
+  --truck-panel-h: 168px;
 }
 .truck-bar {
   position: absolute;
@@ -626,18 +637,19 @@ button:active { transform: translateY(1px); }
 }
 .truck-tools {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 6px;
+  overflow: visible;
   padding: 2px 2px 6px;
-  scrollbar-width: none;
 }
-.truck-tools::-webkit-scrollbar { display: none; }
 .truck-tools .tool {
-  flex: 0 0 76px;
-  width: 76px;
-  min-height: 84px;
+  flex: 1 1 56px;
+  width: auto;
+  min-width: 52px;
+  max-width: 76px;
+  min-height: 72px;
 }
 .tool-truck { color: var(--safety); }
 .tool-truck.tool-path-tag { color: #9ad0ff; }
@@ -702,21 +714,24 @@ body.truck-open .rail {
 
 .req-icon {
   width: 56px; height: 56px;
-  margin-left: -28px; margin-top: -28px;
+  margin: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
   border: 4px solid #111;
   box-shadow: 0 3px 0 #0009;
+  box-sizing: border-box;
 }
-.req-icon svg { width: 34px; height: 34px; }
+.req-icon svg { width: 34px; height: 34px; flex: 0 0 auto; }
 .req-light { background: #2a88b0; color: #dff6ff; }
 .req-heavy { background: #0d4a8a; color: #fff; }
 .req-cleanup { background: #c07810; color: #fff6d8; }
 
 .pin-icon {
   width: 40px; height: 52px;
-  margin-left: -20px; margin-top: -52px;
+  margin: 0;
+  box-sizing: border-box;
 }
+.pin-icon svg { width: 40px; height: 52px; display: block; }
 .dig-badge {
   background: #1c1814ee;
   border: 3px solid var(--dig);
@@ -733,9 +748,11 @@ body.truck-open .rail {
 .dig-badge.done { border-color: #4a8a28; color: #b6f08a; opacity: 0.85; }
 .dig-badge svg { width: 26px; height: 26px; }
 
+/* Fixed CSS-pixel map markers — Leaflet iconSize/iconAnchor place them; no nested neg margins */
 .machine-wrap {
   width: 56px; height: 56px;
-  margin-left: -28px; margin-top: -28px;
+  margin: 0;
+  box-sizing: border-box;
 }
 .machine-body {
   width: 56px; height: 56px;
@@ -743,12 +760,14 @@ body.truck-open .rail {
   border-radius: 50%;
   border: 4px solid #111;
   box-shadow: 0 0 0 3px currentColor, 0 4px 0 #0008;
+  box-sizing: border-box;
 }
-.machine-body svg { width: 36px; height: 36px; }
+.machine-body svg { width: 36px; height: 36px; flex: 0 0 auto; }
 .machine-me { outline: 3px dashed #fff8; outline-offset: 4px; }
 .fleet-wrap {
   width: 52px; height: 52px;
-  margin-left: -26px; margin-top: -26px;
+  margin: 0;
+  box-sizing: border-box;
 }
 .fleet-body {
   width: 52px; height: 52px;
@@ -757,8 +776,9 @@ body.truck-open .rail {
   border: 4px solid #111;
   box-shadow: 0 0 0 3px currentColor, 0 4px 0 #0008;
   background: currentColor;
+  box-sizing: border-box;
 }
-.fleet-body svg { width: 32px; height: 32px; color: #1c1814; }
+.fleet-body svg { width: 32px; height: 32px; color: #1c1814; flex: 0 0 auto; }
 .acc-ring {
   position: absolute;
   border: 2px dashed #f5d54788;
@@ -766,7 +786,41 @@ body.truck-open .rail {
   pointer-events: none;
 }
 
-.leaflet-div-icon { background: transparent; border: none; }
+/* Default DivIcon chrome clear; icon classes below own their own fill/border */
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+.leaflet-div-icon.req-icon,
+.leaflet-div-icon.dig-badge,
+.leaflet-div-icon.path-tag-label,
+.leaflet-div-icon.handle-icon {
+  /* restore class backgrounds that the rule above would clear */
+  background: revert-layer;
+  border: revert-layer;
+}
+.leaflet-div-icon.req-icon { border: 4px solid #111; }
+.leaflet-div-icon.req-light { background: #2a88b0; color: #dff6ff; }
+.leaflet-div-icon.req-heavy { background: #0d4a8a; color: #fff; }
+.leaflet-div-icon.req-cleanup { background: #c07810; color: #fff6d8; }
+.leaflet-div-icon.dig-badge {
+  background: #1c1814ee;
+  border: 3px solid var(--dig);
+  color: #ffd0b0;
+}
+.leaflet-div-icon.dig-badge.started { border-color: var(--safety); color: var(--safety); }
+.leaflet-div-icon.dig-badge.done { border-color: #4a8a28; color: #b6f08a; }
+.leaflet-div-icon.path-tag-label {
+  background: #1c1814ee;
+  border: 2px solid var(--safety);
+  color: var(--safety);
+}
+.leaflet-div-icon.handle-icon {
+  background: var(--safety);
+  border: 4px solid #111;
+}
+.leaflet-div-icon.handle-icon.rotate { background: var(--brass); }
+.leaflet-div-icon.handle-icon.radius { background: var(--clay); }
 .leaflet-tooltip.surface-label { background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 800; font-size: 16px; text-shadow: 0 1px 3px #000; }
 
 .boot-error {

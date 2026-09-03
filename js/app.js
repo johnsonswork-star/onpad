@@ -215,6 +215,8 @@
   let lastLocalView = null;
   let pathDraft = null;
   let pathTagPending = null;
+  /* id -> u of last local drag; merge prefers this over stale MQTT echoes */
+  const localDragWins = Object.create(null);
 
   function emptyState(code) {
     return {
@@ -280,7 +282,11 @@
     (localArr || []).forEach((x) => map.set(x.id, x));
     (remoteArr || []).forEach((x) => {
       const cur = map.get(x.id);
-      if (!cur || (x.u || 0) >= (cur.u || 0)) map.set(x.id, x);
+      if (!cur) { map.set(x.id, x); return; }
+      const dragU = localDragWins[x.id];
+      /* Last local drag wins for that id unless remote is strictly newer than local */
+      if (dragU != null && (cur.u || 0) >= dragU && (x.u || 0) <= (cur.u || 0)) return;
+      if ((x.u || 0) >= (cur.u || 0)) map.set(x.id, x);
     });
     return [...map.values()];
   }
@@ -661,7 +667,8 @@
     });
     state.surfaces.push(item);
     persist();
-    select({ kind: 'surface', id: item.id });
+    /* Finish placing → clear selection bar; tap the surface later to edit */
+    select(null);
   }
 
   function surfaceStyle(type, on) {
@@ -815,23 +822,33 @@
     const cls = kind === 'cleanup' ? 'req-cleanup' : (kind === 'water-heavy' ? 'req-heavy' : 'req-light');
     const svg = kind === 'cleanup' ? SVG.blade : (kind === 'water-heavy' ? SVG.drop : SVG.mist);
     return L.divIcon({
-      className: '',
-      html: '<div class="req-icon ' + cls + '">' + svg + '</div>',
+      className: 'req-icon ' + cls,
+      html: svg,
       iconSize: [56, 56],
       iconAnchor: [28, 28]
     });
   }
 
   function drawRequests() {
+    if (editLock) return;
     layers.requests.clearLayers();
     state.requests.forEach((r) => {
       if (r.gone) return;
       const m = L.marker([r.lat, r.lng], { icon: reqIcon(r.kind), draggable: true, zIndexOffset: 400 });
       m.addTo(layers.requests);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'request', id: r.id }); });
+      m.on('dragstart', () => { editLock = true; map.dragging.disable(); });
+      m.on('drag', () => {
+        const ll = m.getLatLng();
+        r.lat = ll.lat; r.lng = ll.lng; r.u = now();
+        localDragWins[r.id] = r.u;
+      });
       m.on('dragend', () => {
         const ll = m.getLatLng();
         r.lat = ll.lat; r.lng = ll.lng; r.u = now();
+        localDragWins[r.id] = r.u;
+        editLock = false;
+        map.dragging.enable();
         persist();
       });
     });
@@ -883,10 +900,10 @@
 
   function pinDiv() {
     return L.divIcon({
-      className: '',
+      className: 'pin-icon',
       iconSize: [40, 52],
       iconAnchor: [20, 52],
-      html: '<div class="pin-icon"><svg viewBox="0 0 40 52"><path d="M20 0C9 0 2 8 2 18c0 12 18 34 18 34s18-22 18-34C38 8 31 0 20 0z" fill="#f5d547" stroke="#111" stroke-width="3"/><circle cx="20" cy="18" r="6" fill="#1c1814"/></svg></div>'
+      html: '<svg viewBox="0 0 40 52"><path d="M20 0C9 0 2 8 2 18c0 12 18 34 18 34s18-22 18-34C38 8 31 0 20 0z" fill="#f5d547" stroke="#111" stroke-width="3"/><circle cx="20" cy="18" r="6" fill="#1c1814"/></svg>'
     });
   }
 
@@ -930,9 +947,9 @@
       }).addTo(layers.dig);
       poly.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'dig', id: d.id }); });
       const mid = centroid(d.corners.map((c) => L.latLng(c.lat, c.lng)));
-      const html = '<div class="dig-badge ' + d.status + '">' + SVG.shovel + '<span>' + fmtCut(d.cutFt) + '</span></div>';
+      const html = SVG.shovel + '<span>' + fmtCut(d.cutFt) + '</span>';
       L.marker(mid, {
-        icon: L.divIcon({ className: '', html, iconSize: [90, 40], iconAnchor: [45, 20] }),
+        icon: L.divIcon({ className: 'dig-badge ' + d.status, html, iconSize: [90, 40], iconAnchor: [45, 20] }),
         interactive: false,
         zIndexOffset: 500
       }).addTo(layers.dig);
@@ -1127,8 +1144,8 @@
         L.marker(mid, {
           interactive: false,
           icon: L.divIcon({
-            className: '',
-            html: '<div class="path-tag-label">' + (p.tag === 'in' ? 'IN' : 'OUT') + '</div>',
+            className: 'path-tag-label',
+            html: (p.tag === 'in' ? 'IN' : 'OUT'),
             iconSize: [48, 24],
             iconAnchor: [24, 12]
           })
@@ -1149,22 +1166,23 @@
     });
     state.fleet.push(item);
     persist();
-    select({ kind: 'fleet', id: item.id });
+    select(null);
     ui.toast((ROLE_LABEL[kind] || kind) + ' placed');
   }
 
   function fleetIcon(r, on) {
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
     return L.divIcon({
-      className: '',
+      className: 'fleet-wrap',
       iconSize: [52, 52],
       iconAnchor: [26, 26],
-      html: '<div class="fleet-wrap"><div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div></div>'
+      html: '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div>'
     });
   }
 
   function drawFleet() {
     if (!layers || !layers.fleet) return;
+    if (editLock) return; /* don't rebuild mid-drag from MQTT/renderAll — causes snap-back */
     layers.fleet.clearLayers();
     (state.fleet || []).forEach((f) => {
       if (f.gone || f.lat == null) return;
@@ -1175,9 +1193,18 @@
         draggable: true
       }).addTo(layers.fleet);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
+      m.on('dragstart', () => { editLock = true; map.dragging.disable(); });
+      m.on('drag', () => {
+        const ll = m.getLatLng();
+        f.lat = ll.lat; f.lng = ll.lng; f.u = now();
+        localDragWins[f.id] = f.u;
+      });
       m.on('dragend', () => {
         const ll = m.getLatLng();
         f.lat = ll.lat; f.lng = ll.lng; f.u = now();
+        localDragWins[f.id] = f.u;
+        editLock = false;
+        map.dragging.enable();
         persist();
       });
     });
@@ -1192,10 +1219,10 @@
   function machineIcon(r, me) {
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
     return L.divIcon({
-      className: '',
+      className: 'machine-wrap',
       iconSize: [56, 56],
       iconAnchor: [28, 28],
-      html: '<div class="machine-wrap"><div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div></div>'
+      html: '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div>'
     });
   }
 
@@ -1262,7 +1289,12 @@
     const bar = document.getElementById('selectedBar');
     const meta = document.getElementById('selectedMeta');
     const acts = document.getElementById('selectedActions');
-    if (!sel) { bar.hidden = true; return; }
+    if (!sel) {
+      bar.hidden = true;
+      meta.innerHTML = '';
+      acts.innerHTML = '';
+      return;
+    }
     bar.hidden = false;
     acts.innerHTML = '';
     if (sel.kind === 'surface') {
@@ -1317,6 +1349,7 @@
     item.u = now();
     selected = null;
     persist();
+    select(null); /* X clears selection + hides bar (idle default) */
   }
 
   function renderAll() {
@@ -1462,6 +1495,7 @@
         if (t === 'path-draw' || t === 'path-point') return;
         placeTool = placeTool === t ? null : t;
         ui.tools();
+        if (!placeTool) select(null);
         if (placeTool) {
           select(null);
           const tip = {
@@ -1609,8 +1643,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v11').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=11')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v12').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=12')).catch(() => {});
   }
 
   function showBootError(msg) {
