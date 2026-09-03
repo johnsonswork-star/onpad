@@ -120,6 +120,26 @@
   }
   function now() { return Date.now(); }
 
+  /* Account stamp — anonymous local id for later abuse attribution (no login UI). */
+  function localUserId() {
+    try {
+      let id = localStorage.getItem('onpad:userId');
+      if (!id) {
+        id = 'anon-' + uid();
+        localStorage.setItem('onpad:userId', id);
+      }
+      return id;
+    } catch (e) {
+      return 'anon-' + uid();
+    }
+  }
+  function stamp(obj) {
+    const id = localUserId();
+    obj.by = id;
+    obj.userId = id;
+    return obj;
+  }
+
   function rectCorners(s) {
     const origin = { lat: s.lat, lng: s.lng };
     const hw = s.w / 2, hl = s.l / 2;
@@ -180,9 +200,10 @@
 
   function persist() {
     state.u = now();
+    state.job = SHARED_SITE;
     try {
-      localStorage.setItem(storageKey(state.job), JSON.stringify(state));
-      localStorage.setItem('onpad:activeJob', state.job);
+      localStorage.setItem(storageKey(SHARED_SITE), JSON.stringify(state));
+      localStorage.setItem('onpad:activeJob', SHARED_SITE);
       localStorage.setItem('onpad:role', role);
     } catch (e) { /* quota */ }
     schedulePub();
@@ -207,7 +228,7 @@
   function slimState() {
     return {
       v: state.v,
-      job: state.job,
+      job: SHARED_SITE,
       surfaces: state.surfaces,
       requests: state.requests,
       digPads: state.digPads,
@@ -231,9 +252,8 @@
 
   function applyRemote(remote) {
     if (!remote || remote.v !== VERSION) return;
-    /* open site: accept payloads for this room; ignore foreign rooms */
-    if (remote.job && remote.job !== state.job) return;
     applyingRemote = true;
+    state.job = SHARED_SITE;
     state.surfaces = mergeById(state.surfaces, remote.surfaces);
     state.requests = mergeById(state.requests, remote.requests);
     state.digPads = mergeById(state.digPads, remote.digPads);
@@ -276,7 +296,7 @@
   }
 
   /* MQTT sync — public brokers; shared site room (hidden). No API keys. */
-  function topic() { return 'onpad/v1/' + (state.job || SHARED_SITE); }
+  function topic() { return 'onpad/v1/' + SHARED_SITE; }
   function schedulePub() {
     if (applyingRemote) return;
     clearTimeout(pubTimer);
@@ -408,12 +428,12 @@
   /* SVG bits */
   const SVG = {
     shovel: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M14 2h4v14l6 10a8 8 0 1 1-16 0l6-10z" fill="currentColor"/></svg>',
-    drop: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 4c0 0 16 18 16 28a16 16 0 1 1-32 0C8 22 24 4 24 4z" fill="currentColor"/> </svg>',
-    mist: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M24 6c0 0 8 10 8 16a8 8 0 1 1-16 0c0-6 8-16 8-16z" fill="currentColor"/> <circle cx="10" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="18" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="30" cy="40" r="2.6" fill="currentColor" opacity=".7"/> <circle cx="38" cy="34" r="3.2" fill="currentColor" opacity=".85"/> <circle cx="24" cy="42" r="2.2" fill="currentColor" opacity=".55"/> </svg>',
-    blade: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"> <path d="M34 4 L16 30" stroke="currentColor" stroke-width="5" stroke-linecap="round"/> <path d="M4 28 L22 16 L30 30 L8 40 Z" fill="currentColor"/> <path d="M7 36 L3 45 M13 38 L9 46 M19 39 L16 46 M25 37 L25 46" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/> </svg>',
-    dozer: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="10" y="9" width="17" height="9" rx="1.5" fill="currentColor"/> <rect x="19" y="4" width="8" height="7" rx="1.2" fill="currentColor"/> <rect x="1" y="6" width="6" height="15" rx="1" fill="currentColor"/> <rect x="5" y="10" width="6" height="3" fill="currentColor"/> <rect x="8" y="20" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="24" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
-    excavator: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="3" y="12" width="15" height="9" rx="1.5" fill="currentColor"/> <rect x="4" y="6" width="10" height="8" rx="1.2" fill="currentColor"/> <path d="M16 10 L28 4 L29.5 8 L19 13 Z" fill="currentColor"/> <path d="M28 5 L31 16 L27 17.5 L26 8 Z" fill="currentColor"/> <path d="M25 15.5 L32 17 L31 22 L24 19.5 Z" fill="currentColor"/> <rect x="2" y="21" width="19" height="3.5" rx="1" fill="currentColor"/> <circle cx="7" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="17" cy="24" r="3.5" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>',
-    water: '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"> <rect x="1" y="9" width="9" height="10" rx="1.5" fill="currentColor"/> <path d="M2.5 9 V5.5 h6 V9 Z" fill="currentColor"/> <rect x="9" y="6.5" width="20" height="13" rx="6.5" fill="currentColor"/> <rect x="3" y="20" width="24" height="3" rx=".8" fill="currentColor"/> <circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> <circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2.5"/> </svg>'
+    drop: '<svg viewBox="0 0 32 32"><path d="M16 2s10 12 10 18a10 10 0 1 1-20 0C6 14 16 2 16 2z" fill="currentColor"/></svg>',
+    mist: '<svg viewBox="0 0 32 32"><path d="M12 8c0-4 4-8 4-8s4 4 4 8a4 4 0 1 1-8 0z" fill="currentColor"/><circle cx="7" cy="24" r="3" fill="currentColor"/><circle cx="16" cy="28" r="2.2" fill="currentColor"/><circle cx="25" cy="24" r="3" fill="currentColor"/></svg>',
+    blade: '<svg viewBox="0 0 32 32"><path d="M4 20h24l-3 6H7z" fill="currentColor"/><path d="M7 18l3-8h12l3 8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
+    dozer: '<svg viewBox="0 0 32 32"><rect x="4" y="10" width="20" height="10" fill="currentColor"/><rect x="2" y="16" width="10" height="5" fill="currentColor"/><circle cx="10" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
+    excavator: '<svg viewBox="0 0 32 32"><rect x="6" y="12" width="14" height="8" fill="currentColor"/><path d="M20 14l10-8-2 8-6 3" fill="currentColor"/><circle cx="12" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>',
+    water: '<svg viewBox="0 0 32 32"><rect x="2" y="12" width="10" height="8" fill="currentColor"/><ellipse cx="20" cy="16" rx="9" ry="6" fill="currentColor"/><circle cx="8" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="24" r="4" fill="#1c1814" stroke="currentColor" stroke-width="2"/></svg>'
   };
 
   /* map + layers */
@@ -563,7 +583,7 @@
 
   function placeSurface(type, latlng) {
     const d = DEFAULTS[type];
-    const item = {
+    const item = stamp({
       id: uid(),
       type,
       lat: latlng.lat,
@@ -573,7 +593,7 @@
       r: d.r || 0,
       rot: d.rot || 0,
       u: now()
-    };
+    });
     state.surfaces.push(item);
     persist();
     select({ kind: 'surface', id: item.id });
@@ -716,13 +736,13 @@
 
   /* requests */
   function placeRequest(kind, latlng) {
-    state.requests.push({
+    state.requests.push(stamp({
       id: uid(),
       kind,
       lat: latlng.lat,
       lng: latlng.lng,
       u: now()
-    });
+    }));
     persist();
   }
 
@@ -760,7 +780,7 @@
       return;
     }
     const pins = state.stakeDraft.pins.slice();
-    pins.push({ lat: pos.lat, lng: pos.lng, accM: pos.accM, t: now() });
+    pins.push(stamp({ lat: pos.lat, lng: pos.lng, accM: pos.accM, t: now() }));
     state.stakeDraft = { pins, u: now() };
     persist();
     const n = pins.length;
@@ -783,13 +803,13 @@
       ui.toast('Need 3+ pins');
       return;
     }
-    state.digPads.push({
+    state.digPads.push(stamp({
       id: uid(),
       corners: pins.map((p) => ({ lat: p.lat, lng: p.lng })),
       cutFt,
       status: 'ready',
       u: now()
-    });
+    }));
     state.stakeDraft = { pins: [], u: now() };
     persist();
     ui.toast('DIG  ' + cutFt + ' ft');
@@ -871,26 +891,38 @@
 
   function startPathDraft() {
     ensurePaths();
-    pathDraft = { id: uid(), pts: [], tag: pathTagPending || null, u: now() };
+    if (pathDraft && !pathDraft.gone) {
+      placeTool = 'path-draw';
+      ui.tools();
+      ui.pathHint(pathDraft.pts.length
+        ? ('Points: ' + pathDraft.pts.length + ' · tap more or Done')
+        : 'Tap map to drop haul points · Done when finished');
+      openTruckBar(true);
+      return;
+    }
+    pathDraft = stamp({ id: uid(), pts: [], tag: pathTagPending || null, u: now(), draft: true });
+    state.paths.push(pathDraft);
     placeTool = 'path-draw';
     ui.tools();
     ui.pathHint('Tap map to drop haul points · Done when finished');
     ui.toast('Path started — tap map');
     openTruckBar(true);
+    persist();
   }
 
   function addPathPoint(latlng) {
     if (!pathDraft) startPathDraft();
     pathDraft.pts.push({ lat: latlng.lat, lng: latlng.lng });
     pathDraft.u = now();
-    drawPaths();
+    persist();
     ui.pathHint('Points: ' + pathDraft.pts.length + ' · tap more or Done');
   }
 
   function undoPathPoint() {
     if (pathDraft && pathDraft.pts.length) {
       pathDraft.pts.pop();
-      drawPaths();
+      pathDraft.u = now();
+      persist();
       ui.pathHint(pathDraft.pts.length ? ('Points: ' + pathDraft.pts.length) : 'Tap map to drop haul points');
       return;
     }
@@ -919,12 +951,8 @@
     }
     ensurePaths();
     if (pathTagPending) pathDraft.tag = pathTagPending;
-    state.paths.push({
-      id: pathDraft.id,
-      pts: pathDraft.pts.slice(),
-      tag: pathDraft.tag || null,
-      u: now()
-    });
+    pathDraft.draft = false;
+    pathDraft.u = now();
     pathDraft = null;
     placeTool = null;
     ui.tools();
@@ -936,10 +964,12 @@
   function clearPaths() {
     ensurePaths();
     if (pathDraft) {
+      pathDraft.gone = true;
+      pathDraft.u = now();
       pathDraft = null;
       placeTool = null;
       ui.tools();
-      drawPaths();
+      persist();
       ui.pathHint('Draft cleared');
       ui.toast('Draft cleared');
       return;
@@ -994,18 +1024,24 @@
     if (!layers || !layers.paths) return;
     layers.paths.clearLayers();
     ensurePaths();
-    const all = state.paths.slice();
-    if (pathDraft && pathDraft.pts.length) {
-      all.push(Object.assign({ _draft: true }, pathDraft));
-    }
-    all.forEach((p) => {
+    (state.paths || []).forEach((p) => {
       if (p.gone || !p.pts || p.pts.length < 1) return;
       const on = selected && selected.kind === 'path' && selected.id === p.id;
+      const draft = !!(p.draft || (pathDraft && p.id === pathDraft.id));
       const latlngs = p.pts.map((pt) => [pt.lat, pt.lng]);
       if (latlngs.length >= 2) {
-        const line = L.polyline(latlngs, Object.assign({ interactive: !p._draft }, pathStyle(p.tag, on, p._draft)));
+        const style = pathStyle(p.tag, on, draft);
+        L.polyline(latlngs, {
+          color: '#111',
+          weight: (style.weight || 8) + 6,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: false
+        }).addTo(layers.paths);
+        const line = L.polyline(latlngs, Object.assign({ interactive: !draft }, style));
         line.addTo(layers.paths);
-        if (!p._draft) {
+        if (!draft) {
           line.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'path', id: p.id }); });
         }
       }
@@ -1021,7 +1057,7 @@
           interactive: false
         }).addTo(layers.paths);
       });
-      if (!p._draft && p.tag && latlngs.length >= 2) {
+      if (!draft && p.tag && latlngs.length >= 2) {
         const mid = latlngs[(latlngs.length / 2) | 0];
         L.marker(mid, {
           interactive: false,
@@ -1039,13 +1075,13 @@
   /* fleet — manually placed machine markers (not GPS "me") */
   function placeFleet(kind, latlng) {
     if (!state.fleet) state.fleet = [];
-    const item = {
+    const item = stamp({
       id: uid(),
       role: kind,
       lat: latlng.lat,
       lng: latlng.lng,
       u: now()
-    };
+    });
     state.fleet.push(item);
     persist();
     select({ kind: 'fleet', id: item.id });
@@ -1357,6 +1393,8 @@
       b.addEventListener('click', () => {
         const t = b.getAttribute('data-tool');
         if (t === 'corner-pin') { dropCornerPin(); return; }
+        /* path tools have dedicated handlers — don't toggle here */
+        if (t === 'path-draw' || t === 'path-point') return;
         placeTool = placeTool === t ? null : t;
         ui.tools();
         if (placeTool) {
@@ -1433,25 +1471,18 @@
   }
 
   function bootFromUrl() {
-    /* Open site: everyone joining the Pages URL shares one pad (SITE).
-       Optional ?job= still works for power users but is never shown in the HUD. */
+    /* Open site: everyone on this Pages URL shares one pad (SITE).
+       Job codes are gone — MQTT room stays hidden behind SHARED_SITE. */
     const u = new URL(location.href);
-    const q = (u.searchParams.get('job') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     const hash = (u.hash || '').replace(/^#/, '');
     let snap = null;
     if (hash.startsWith('s=')) snap = decodeSnap(hash.slice(2));
-    const code = q || SHARED_SITE;
+    const code = SHARED_SITE;
     state = loadJob(code, emptyState(code));
     state.job = code;
     if (!Array.isArray(state.paths)) state.paths = [];
-    if (snap) {
-      if (snap.job && snap.job !== code && q) {
-        /* ignore mismatched snap when forcing a job */
-      } else {
-        applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
-      }
-    }
-    /* strip legacy job codes from the URL so drivers see a clean link */
+    if (snap) applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
+    /* strip legacy job codes / snapshots from the URL so drivers see a clean link */
     if (u.searchParams.has('job') || u.hash) {
       u.searchParams.delete('job');
       history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : ''));
@@ -1468,7 +1499,7 @@
     schedulePub();
     if (!didFly) {
       didFly = true;
-      const hasStuff = state.surfaces.length || state.digPads.length || (state.stakeDraft.pins || []).length;
+      const hasStuff = state.surfaces.length || state.digPads.length || (state.stakeDraft.pins || []).length || ((state.paths || []).some((x) => !x.gone && x.pts && x.pts.length));
       if (!hasStuff || map.getZoom() < 12) map.setView([pos.lat, pos.lng], 18);
     }
   }

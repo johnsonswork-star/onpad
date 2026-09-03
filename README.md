@@ -31,6 +31,7 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 ## Sync
 
 - State is saved in `localStorage` for the shared site room.
+- Created features carry optional `by` / `userId` (anonymous local id) so abuse can be attributed later. No login / report / ban UI yet.
 - **Live (best-effort):** MQTT room `onpad/v1/SITE` on public brokers. Badge **LIVE** / **SOLO**. Obscure room, not private.
 
 ## GitHub Pages
@@ -39,4 +40,4 @@ Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the
 
 ## Stack
 
-Plain HTML / CSS / JS. Leaflet + Esri World Imagery. MQTT for optional live. Icon Shop SVGs inlined (`img/icons/` sources). PWA manifest + service worker.
+Plain HTML / CSS / JS. Leaflet + Esri World Imagery. MQTT for optional live. PWA manifest + service worker.

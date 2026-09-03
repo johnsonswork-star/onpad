@@ -54,6 +54,7 @@ body {
 }
 .leaflet-control-attribution a { color: #c4b49a !important; }
 .leaflet-control-zoom { display: none; }
+.leaflet-bottom { bottom: calc(var(--truck-handle-h, 58px) + 6px + var(--safe-b)); }
 
 /* ========== TOP IDENTITY BAR ========== */
 #topbar {
@@ -484,8 +485,8 @@ button:active { transform: translateY(1px); }
 
 /* ========== BOTTOM TRUCK BAR ========== */
 :root {
-  --truck-handle-h: 52px;
-  --truck-panel-h: 148px;
+  --truck-handle-h: 58px;
+  --truck-panel-h: 156px;
 }
 .truck-bar {
   position: absolute;
@@ -510,7 +511,7 @@ button:active { transform: translateY(1px); }
   min-width: min(92vw, 420px);
   margin: 0 8px;
   padding: 8px 16px calc(8px + var(--safe-b));
-  border: 4px solid var(--brass);
+  border: 4px solid var(--safety);
   border-bottom: 0;
   border-radius: 16px 16px 0 0;
   background: linear-gradient(180deg, #3a3228, #2a231c);
@@ -522,11 +523,13 @@ button:active { transform: translateY(1px); }
 }
 .truck-handle-grip {
   position: absolute;
-  top: 6px;
-  width: 48px;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--edge);
+  top: 7px;
+  left: 50%;
+  width: 64px;
+  height: 7px;
+  margin-left: -32px;
+  border-radius: 4px;
+  background: var(--brass);
 }
 .truck-handle { position: relative; padding-top: 14px; }
 .truck-handle-icon {
@@ -547,6 +550,7 @@ button:active { transform: translateY(1px); }
   margin-left: 4px;
 }
 .truck-bar.open .truck-handle-chevron { transform: rotate(180deg); }
+.truck-bar.open .truck-handle { padding-bottom: 8px; }
 .truck-panel {
   height: var(--truck-panel-h);
   padding: 8px 10px 10px;
