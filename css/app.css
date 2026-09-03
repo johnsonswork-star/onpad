@@ -248,12 +248,15 @@ body {
   box-shadow: var(--shadow);
 }
 
-/* Sheets */
+/* Sheets — must respect [hidden] or every sheet covers the map */
 .sheet {
   position: fixed; inset: 0; z-index: 900;
   background: #000a;
   display: flex; align-items: flex-end; justify-content: center;
   padding: 12px 12px calc(12px + var(--safe-b));
+}
+.sheet[hidden] {
+  display: none !important;
 }
 .sheet-card {
   width: min(520px, 100%);
