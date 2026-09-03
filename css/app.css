@@ -450,3 +450,31 @@ button:active { transform: translateY(1px); }
 
 .leaflet-div-icon { background: transparent; border: none; }
 .leaflet-tooltip.surface-label { background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 800; font-size: 16px; text-shadow: 0 1px 3px #000; }
+
+.boot-error {
+  position: absolute;
+  z-index: 2000;
+  left: 12px; right: 12px; top: 30%;
+  padding: 16px;
+  background: #4a2018;
+  color: #ffe0d0;
+  border: 3px solid #e24a3c;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.fab-map {
+  right: 10px;
+  bottom: calc(var(--dock-h) + 84px + var(--safe-b));
+  width: 64px; height: 48px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--dust);
+  padding: 0;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .fab-map { right: calc(min(168px, 38vw) + 10px); bottom: calc(84px + var(--safe-b)); }
+}

@@ -12,8 +12,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=1" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css?v=2" />
 </head>
 <body>
   <div id="app">
@@ -34,6 +34,7 @@
       </div>
     </header>
 
+    <button type="button" id="basemapBtn" class="fab fab-map" aria-label="Switch map style">MAP</button>
     <button type="button" id="recenterBtn" class="fab" aria-label="Recenter on machine">
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="4"/>
@@ -46,6 +47,7 @@
       <div id="selectedActions" class="selected-actions"></div>
     </div>
 
+    <div id="bootError" class="boot-error" hidden></div>
     <div id="toast" class="toast" hidden></div>
 
     <nav id="dock" aria-label="Tools">
@@ -183,8 +185,8 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
-  <script src="js/app.js?v=1"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/mqtt/mqtt.min.js"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

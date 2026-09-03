@@ -396,18 +396,66 @@
   };
 
   /* map + layers */
-  function initMap() {
-    map = L.map('map', {
-      zoomControl: false,
-      attributionControl: true,
-      tap: true,
-      tapTolerance: 28
-    });
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  let satLayer, streetLayer, activeBasemap = 'sat';
+  let tileFailCount = 0;
+
+  function makeSatLayer() {
+    return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 20,
       maxNativeZoom: 19,
       attribution: 'Tiles © Esri — Esri, Maxar, Earthstar Geographics'
-    }).addTo(map);
+    });
+  }
+  function makeStreetLayer() {
+    return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    });
+  }
+  function setBasemap(kind) {
+    if (!map) return;
+    if (satLayer) map.removeLayer(satLayer);
+    if (streetLayer) map.removeLayer(streetLayer);
+    activeBasemap = kind;
+    if (kind === 'street') {
+      streetLayer = makeStreetLayer();
+      streetLayer.addTo(map);
+      streetLayer.bringToBack();
+    } else {
+      satLayer = makeSatLayer();
+      satLayer.on('tileerror', onTileError);
+      satLayer.addTo(map);
+      satLayer.bringToBack();
+    }
+    const btn = document.getElementById('basemapBtn');
+    if (btn) btn.textContent = kind === 'sat' ? 'MAP' : 'SAT';
+    try { localStorage.setItem('onpad:basemap', kind); } catch (e) {}
+  }
+  function onTileError() {
+    tileFailCount += 1;
+    if (tileFailCount >= 6 && activeBasemap === 'sat') {
+      tileFailCount = 0;
+      ui.toast('Satellite blocked — switching to street map');
+      setBasemap('street');
+    }
+  }
+  function refreshMapSize() {
+    if (!map) return;
+    try { map.invalidateSize(true); } catch (e) {}
+  }
+
+  function initMap() {
+    if (typeof L === 'undefined') {
+      throw new Error('Map library failed to load. Check your connection and hard-refresh.');
+    }
+    map = L.map('map', {
+      zoomControl: false,
+      attributionControl: true
+    });
+
+    let prefer = 'sat';
+    try { prefer = localStorage.getItem('onpad:basemap') || 'sat'; } catch (e) {}
+    setBasemap(prefer);
 
     layers = {
       surfaces: L.layerGroup().addTo(map),
@@ -419,8 +467,9 @@
     handleGroup = L.layerGroup().addTo(map);
 
     const saved = lastLocalView;
-    if (saved) map.setView([saved.lat, saved.lng], saved.zoom);
-    else map.setView([39.5, -98.4], 5);
+    // Blue Ridge, TX area so the map shows real dirt before GPS locks
+    if (saved && saved.lat != null) map.setView([saved.lat, saved.lng], saved.zoom || 14);
+    else map.setView([33.30, -96.40], 14);
 
     map.on('click', onMapClick);
     map.on('moveend', () => {
@@ -429,9 +478,17 @@
       try { localStorage.setItem('onpad:view', JSON.stringify(lastLocalView)); } catch (e) {}
     });
 
-    ['topbar', 'dock', 'selectedBar', 'recenterBtn'].forEach((id) => {
+    ['topbar', 'dock', 'selectedBar', 'recenterBtn', 'basemapBtn'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
+    });
+
+    setTimeout(refreshMapSize, 100);
+    setTimeout(refreshMapSize, 500);
+    window.addEventListener('resize', refreshMapSize);
+    window.addEventListener('orientationchange', () => setTimeout(refreshMapSize, 250));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') setTimeout(refreshMapSize, 100);
     });
   }
 
@@ -894,6 +951,9 @@
   function bind() {
     document.getElementById('jobBtn').addEventListener('click', () => openSheet('jobSheet'));
     document.getElementById('roleBtn').addEventListener('click', () => openSheet('roleSheet'));
+    document.getElementById('basemapBtn').addEventListener('click', () => {
+      setBasemap(activeBasemap === 'sat' ? 'street' : 'sat');
+    });
     document.getElementById('recenterBtn').addEventListener('click', () => {
       const pos = PositionSource.getLatLng();
       if (pos) map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 18));
@@ -1026,18 +1086,33 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
+  function showBootError(msg) {
+    const el = document.getElementById('bootError');
+    if (!el) {
+      alert(msg);
+      return;
+    }
+    el.hidden = false;
+    el.textContent = msg;
+  }
+
   function boot() {
-    bootFromUrl();
-    ui.job();
-    ui.role();
-    initMap();
-    bind();
-    renderAll();
-    PositionSource.on(onPos);
-    PositionSource.startPhoneGps();
-    connectMqtt(0);
-    registerSw();
-    document.getElementById('roleIcon').innerHTML = roleSvg(role);
+    try {
+      bootFromUrl();
+      ui.job();
+      ui.role();
+      initMap();
+      bind();
+      renderAll();
+      PositionSource.on(onPos);
+      PositionSource.startPhoneGps();
+      try { connectMqtt(0); } catch (e) { ui.sync('local'); }
+      registerSw();
+      document.getElementById('roleIcon').innerHTML = roleSvg(role);
+    } catch (err) {
+      console.error(err);
+      showBootError('OnPad failed to start: ' + (err && err.message ? err.message : String(err)));
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
