@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>OnPad</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css?v=1" />
+</head>
+<body>
+  <div id="app">
+    <div id="map" role="application" aria-label="Jobsite satellite map"></div>
+
+    <header id="topbar">
+      <button type="button" id="jobBtn" class="chip job-chip" aria-label="Job code">
+        <span class="chip-kicker">JOB</span>
+        <span id="jobCodeLabel" class="chip-value">----</span>
+      </button>
+      <button type="button" id="roleBtn" class="chip role-chip role-dozer" aria-label="Machine role">
+        <span id="roleIcon" class="chip-icon" aria-hidden="true"></span>
+        <span id="roleLabel" class="chip-value">Dozer</span>
+      </button>
+      <div class="status-cluster">
+        <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
+        <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
+      </div>
+    </header>
+
+    <button type="button" id="recenterBtn" class="fab" aria-label="Recenter on machine">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="4"/>
+        <path d="M24 4v8M24 36v8M4 24h8M36 24h8" stroke="currentColor" stroke-width="4" fill="none"/>
+      </svg>
+    </button>
+
+    <div id="selectedBar" class="selected-bar" hidden>
+      <div id="selectedMeta" class="selected-meta"></div>
+      <div id="selectedActions" class="selected-actions"></div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <nav id="dock" aria-label="Tools">
+      <div class="dock-row" id="surfaceRow">
+        <button type="button" class="tool" data-tool="pad" aria-label="Pad">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="14" width="32" height="20" rx="2" fill="currentColor"/></svg>
+          <span>Pad</span>
+        </button>
+        <button type="button" class="tool" data-tool="road" aria-label="Road">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="20" width="36" height="8" rx="2" transform="rotate(-18 24 24)" fill="currentColor"/></svg>
+          <span>Road</span>
+        </button>
+        <button type="button" class="tool" data-tool="pile" aria-label="Pile">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="5" fill="currentColor"/></svg>
+          <span>Pile</span>
+        </button>
+      </div>
+      <div class="dock-row" id="callRow">
+        <button type="button" class="tool tool-water" data-tool="water-light" aria-label="Light spray">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M18 20c0-6 6-14 6-14s6 8 6 14a6 6 0 1 1-12 0z" fill="currentColor"/>
+            <circle cx="12" cy="36" r="3" fill="currentColor" opacity=".7"/>
+            <circle cx="24" cy="40" r="2.4" fill="currentColor" opacity=".55"/>
+            <circle cx="36" cy="36" r="3" fill="currentColor" opacity=".7"/>
+          </svg>
+          <span>Light</span>
+        </button>
+        <button type="button" class="tool tool-water-heavy" data-tool="water-heavy" aria-label="Heavy water">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M24 6s14 16 14 24a14 14 0 1 1-28 0C10 22 24 6 24 6z" fill="currentColor"/>
+          </svg>
+          <span>Heavy</span>
+        </button>
+        <button type="button" class="tool tool-cleanup" data-tool="cleanup" aria-label="Cleanup">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M6 30h36l-4 8H10z" fill="currentColor"/>
+            <path d="M10 28l4-12h20l4 12" fill="none" stroke="currentColor" stroke-width="4"/>
+          </svg>
+          <span>Clean</span>
+        </button>
+      </div>
+      <div class="dock-row" id="stakeRow">
+        <button type="button" class="tool tool-pin" id="pinBtn" data-tool="corner-pin" aria-label="Drop corner pin at GPS">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M24 4c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="currentColor"/>
+            <circle cx="24" cy="18" r="5" fill="#1c1814"/>
+          </svg>
+          <span>Pin</span>
+          <b id="pinCount" class="count-badge">0</b>
+        </button>
+        <button type="button" class="tool" id="undoPinBtn" aria-label="Undo last pin">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M16 18H8l8-8M8 18c6-10 26-10 32 2" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+            <path d="M14 34h20" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <span>Undo</span>
+        </button>
+        <button type="button" class="tool tool-cut" id="cutBtn" aria-label="Set cut depth">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M8 14h32M8 24h32M8 34h32" stroke="currentColor" stroke-width="3" opacity=".45"/>
+            <path d="M24 8v32M16 28l8 10 8-10" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+          </svg>
+          <span>Cut</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Role sheet -->
+  <div id="roleSheet" class="sheet" hidden>
+    <div class="sheet-card">
+      <h2>Machine</h2>
+      <div class="role-grid">
+        <button type="button" class="role-pick role-dozer" data-role="dozer">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="8" y="18" width="40" height="14" rx="2" fill="currentColor"/><rect x="4" y="28" width="18" height="6" fill="currentColor"/><circle cx="18" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="42" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+          <span>Dozer</span>
+        </button>
+        <button type="button" class="role-pick role-excavator" data-role="excavator">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="18" y="22" width="28" height="12" rx="2" fill="currentColor"/><path d="M44 24l16-10-4 10-8 4" fill="currentColor"/><circle cx="28" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="46" cy="38" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+          <span>Excavator</span>
+        </button>
+        <button type="button" class="role-pick role-water" data-role="water">
+          <svg viewBox="0 0 64 48" aria-hidden="true"><rect x="6" y="20" width="18" height="12" rx="2" fill="currentColor"/><ellipse cx="40" cy="26" rx="16" ry="10" fill="currentColor"/><circle cx="16" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="42" cy="38" r="6" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+          <span>Water</span>
+        </button>
+      </div>
+      <button type="button" class="sheet-close" data-close="roleSheet">Close</button>
+    </div>
+  </div>
+
+  <!-- Job sheet -->
+  <div id="jobSheet" class="sheet" hidden>
+    <div class="sheet-card">
+      <h2>Job</h2>
+      <p class="job-huge" id="jobHuge">----</p>
+      <div class="sheet-actions">
+        <button type="button" id="newJobBtn" class="fat">New job</button>
+        <button type="button" id="joinJobBtn" class="fat">Join</button>
+        <button type="button" id="copyJobBtn" class="fat">Copy code</button>
+        <button type="button" id="shareJobBtn" class="fat">Share link</button>
+      </div>
+      <button type="button" class="sheet-close" data-close="jobSheet">Close</button>
+    </div>
+  </div>
+
+  <!-- Join sheet -->
+  <div id="joinSheet" class="sheet" hidden>
+    <div class="sheet-card">
+      <h2>Join job</h2>
+      <input id="joinInput" class="code-input" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="CODE" />
+      <div class="sheet-actions">
+        <button type="button" id="joinGoBtn" class="fat primary">Go</button>
+      </div>
+      <button type="button" class="sheet-close" data-close="joinSheet">Close</button>
+    </div>
+  </div>
+
+  <!-- Cut sheet -->
+  <div id="cutSheet" class="sheet" hidden>
+    <div class="sheet-card">
+      <h2>Cut</h2>
+      <p class="hint" id="cutHint">How much to take off (ft)</p>
+      <div class="cut-presets">
+        <button type="button" class="cut-chip" data-cut="0.5">0.5</button>
+        <button type="button" class="cut-chip" data-cut="1">1.0</button>
+        <button type="button" class="cut-chip" data-cut="1.5">1.5</button>
+        <button type="button" class="cut-chip" data-cut="2">2.0</button>
+        <button type="button" class="cut-chip" data-cut="3">3.0</button>
+      </div>
+      <input id="cutInput" class="code-input" inputmode="decimal" placeholder="ft" />
+      <div class="sheet-actions">
+        <button type="button" id="cutGoBtn" class="fat primary">Set cut</button>
+      </div>
+      <button type="button" class="sheet-close" data-close="cutSheet">Close</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+  <script src="js/app.js?v=1"></script>
+</body>
+</html>
