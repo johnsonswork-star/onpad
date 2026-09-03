@@ -484,7 +484,7 @@
     const input = document.getElementById('displayNameInput');
     if (input && document.activeElement !== input) input.value = name;
     const btn = document.getElementById('continueAsBtn');
-    if (btn) btn.textContent = 'Continue as ' + (name || 'Guest');
+    if (btn) btn.textContent = 'Continue as ' + (name || 'truck driver');
     const chip = document.getElementById('userIdChip');
     if (chip) {
       const id = localUserId();
@@ -1553,7 +1553,7 @@
         setDisplayName(nameInput.value);
         const btn = document.getElementById('continueAsBtn');
         const n = displayName();
-        if (btn) btn.textContent = 'Continue as ' + (n || 'Guest');
+        if (btn) btn.textContent = 'Continue as ' + (n || 'truck driver');
         ui.role();
       });
       nameInput.addEventListener('change', saveName);
@@ -1648,8 +1648,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v12').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=12')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v13').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=13')).catch(() => {});
   }
 
   function showBootError(msg) {
