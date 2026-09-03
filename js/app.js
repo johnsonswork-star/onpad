@@ -165,6 +165,7 @@
       surfaces: [],
       requests: [],
       digPads: [],
+      fleet: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
       u: now()
@@ -189,7 +190,10 @@
       const raw = localStorage.getItem(storageKey(code));
       if (raw) {
         const s = JSON.parse(raw);
-        if (s && s.v === VERSION) return s;
+        if (s && s.v === VERSION) {
+          if (!Array.isArray(s.fleet)) s.fleet = [];
+          return s;
+        }
       }
     } catch (e) { /* ignore */ }
     return fallback || emptyState(code);
@@ -202,6 +206,7 @@
       surfaces: state.surfaces,
       requests: state.requests,
       digPads: state.digPads,
+      fleet: state.fleet || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
       u: state.u
@@ -224,6 +229,7 @@
     state.surfaces = mergeById(state.surfaces, remote.surfaces);
     state.requests = mergeById(state.requests, remote.requests);
     state.digPads = mergeById(state.digPads, remote.digPads);
+    state.fleet = mergeById(state.fleet || [], remote.fleet || []);
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
     const lu = (state.stakeDraft && state.stakeDraft.u) || 0;
     if (ru >= lu) state.stakeDraft = remote.stakeDraft || { pins: [], u: 0 };
@@ -360,9 +366,10 @@
     },
     role() {
       const btn = document.getElementById('roleBtn');
-      btn.className = 'chip role-chip role-' + role;
+      btn.className = 'identity role-' + role;
       document.getElementById('roleLabel').textContent = ROLE_LABEL[role];
-      document.getElementById('stakeRow').style.display = role === 'dozer' ? 'flex' : 'none';
+      const stake = document.getElementById('stakeRow');
+      if (stake) stake.style.display = role === 'dozer' ? 'flex' : 'none';
       document.body.classList.remove('role-dozer', 'role-excavator', 'role-water');
       document.body.classList.add('role-' + role);
       const ico = document.getElementById('roleIcon');
@@ -429,7 +436,12 @@
       satLayer.bringToBack();
     }
     const btn = document.getElementById('basemapBtn');
-    if (btn) btn.textContent = kind === 'sat' ? 'MAP' : 'SAT';
+    if (btn) {
+      const label = kind === 'sat' ? 'MAP' : 'SAT';
+      const span = btn.querySelector('.tool-text-only');
+      if (span) span.textContent = label;
+      else btn.textContent = label;
+    }
     try { localStorage.setItem('onpad:basemap', kind); } catch (e) {}
   }
   function onTileError() {
@@ -473,6 +485,7 @@
       requests: L.layerGroup().addTo(map),
       stake: L.layerGroup().addTo(map),
       dig: L.layerGroup().addTo(map),
+      fleet: L.layerGroup().addTo(map),
       machines: L.layerGroup().addTo(map)
     };
     handleGroup = L.layerGroup().addTo(map);
@@ -489,7 +502,7 @@
       try { localStorage.setItem('onpad:view', JSON.stringify(lastLocalView)); } catch (e) {}
     });
 
-    ['topbar', 'dock', 'selectedBar', 'recenterBtn', 'basemapBtn'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -512,6 +525,13 @@
     }
     if (placeTool === 'water-light' || placeTool === 'water-heavy' || placeTool === 'cleanup') {
       placeRequest(placeTool, e.latlng);
+      return;
+    }
+    if (placeTool === 'place-dozer' || placeTool === 'place-excavator' || placeTool === 'place-water') {
+      const kind = placeTool === 'place-excavator' ? 'excavator' : (placeTool === 'place-water' ? 'water' : 'dozer');
+      placeFleet(kind, e.latlng);
+      placeTool = null;
+      ui.tools();
       return;
     }
     select(null);
@@ -820,6 +840,53 @@
     return (Math.round(x * 10) / 10) + '′';
   }
 
+
+  /* fleet — manually placed machine markers (not GPS "me") */
+  function placeFleet(kind, latlng) {
+    if (!state.fleet) state.fleet = [];
+    const item = {
+      id: uid(),
+      role: kind,
+      lat: latlng.lat,
+      lng: latlng.lng,
+      u: now()
+    };
+    state.fleet.push(item);
+    persist();
+    select({ kind: 'fleet', id: item.id });
+    ui.toast((ROLE_LABEL[kind] || kind) + ' placed');
+  }
+
+  function fleetIcon(r, on) {
+    const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
+    return L.divIcon({
+      className: '',
+      iconSize: [52, 52],
+      iconAnchor: [26, 26],
+      html: '<div class="fleet-wrap"><div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div></div>'
+    });
+  }
+
+  function drawFleet() {
+    if (!layers || !layers.fleet) return;
+    layers.fleet.clearLayers();
+    (state.fleet || []).forEach((f) => {
+      if (f.gone || f.lat == null) return;
+      const on = selected && selected.kind === 'fleet' && selected.id === f.id;
+      const m = L.marker([f.lat, f.lng], {
+        icon: fleetIcon(f.role, on),
+        zIndexOffset: 700,
+        draggable: true
+      }).addTo(layers.fleet);
+      m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
+      m.on('dragend', () => {
+        const ll = m.getLatLng();
+        f.lat = ll.lat; f.lng = ll.lng; f.u = now();
+        persist();
+      });
+    });
+  }
+
   /* machines */
   function roleSvg(r) {
     if (r === 'excavator') return SVG.excavator;
@@ -894,6 +961,7 @@
     drawSurfaces();
     drawRequests();
     drawDigPads();
+    drawFleet();
     const bar = document.getElementById('selectedBar');
     const meta = document.getElementById('selectedMeta');
     const acts = document.getElementById('selectedActions');
@@ -923,6 +991,11 @@
         acts.appendChild(actBtn('✓', 'ok', () => { d.status = 'done'; d.u = now(); persist(); select(sel); }));
       }
       if (role === 'dozer') acts.appendChild(killBtn(() => removeItem(state.digPads, d)));
+    } else if (sel.kind === 'fleet') {
+      const f = findById(state.fleet || [], sel.id);
+      if (!f) { bar.hidden = true; return; }
+      meta.innerHTML = roleSvg(f.role) + '<span>' + (ROLE_LABEL[f.role] || f.role).toUpperCase() + '</span>';
+      acts.appendChild(killBtn(() => removeItem(state.fleet, f)));
     }
   }
 
@@ -953,12 +1026,54 @@
     drawRequests();
     drawStake();
     drawDigPads();
+    drawFleet();
     drawMachines();
     if (selected) select(selected);
     else document.getElementById('selectedBar').hidden = true;
   }
 
   /* events */
+  function syncRailBody() {
+    const left = document.getElementById('leftRail');
+    const right = document.getElementById('rightRail');
+    document.body.classList.toggle('rails-left-open', !!(left && left.classList.contains('open')));
+    document.body.classList.toggle('rails-right-open', !!(right && right.classList.contains('open')));
+    const lh = document.getElementById('leftRailHandle');
+    const rh = document.getElementById('rightRailHandle');
+    if (lh && left) {
+      const open = left.classList.contains('open');
+      lh.textContent = open ? '‹' : '›';
+      lh.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    if (rh && right) {
+      const open = right.classList.contains('open');
+      rh.textContent = open ? '›' : '‹';
+      rh.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    setTimeout(refreshMapSize, 240);
+  }
+
+  function toggleRail(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('open');
+    try { localStorage.setItem('onpad:rail:' + id, el.classList.contains('open') ? '1' : '0'); } catch (e) {}
+    syncRailBody();
+  }
+
+  function restoreRails() {
+    ['leftRail', 'rightRail'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      try {
+        const v = localStorage.getItem('onpad:rail:' + id);
+        if (v === '0') el.classList.remove('open');
+        else if (v === '1') el.classList.add('open');
+      } catch (e) {}
+    });
+    syncRailBody();
+  }
+
   function bind() {
     document.getElementById('jobBtn').addEventListener('click', () => openSheet('jobSheet'));
     document.getElementById('roleBtn').addEventListener('click', () => openSheet('roleSheet'));
@@ -970,13 +1085,30 @@
       if (pos) map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 18));
       else ui.toast('No GPS yet');
     });
+    document.getElementById('leftRailHandle').addEventListener('click', () => toggleRail('leftRail'));
+    document.getElementById('rightRailHandle').addEventListener('click', () => toggleRail('rightRail'));
+    restoreRails();
     document.querySelectorAll('.tool[data-tool]').forEach((b) => {
       b.addEventListener('click', () => {
         const t = b.getAttribute('data-tool');
         if (t === 'corner-pin') { dropCornerPin(); return; }
         placeTool = placeTool === t ? null : t;
         ui.tools();
-        if (placeTool) select(null);
+        if (placeTool) {
+          select(null);
+          const tip = {
+            'place-dozer': 'Tap map to put a dozer',
+            'place-excavator': 'Tap map to put an excavator',
+            'place-water': 'Tap map to put a water truck',
+            pad: 'Tap map to put a pad',
+            road: 'Tap map to put a road',
+            pile: 'Tap map to put a pile',
+            'water-light': 'Tap map for light spray',
+            'water-heavy': 'Tap map for heavy water',
+            cleanup: 'Tap map for cleanup'
+          };
+          if (tip[placeTool]) ui.toast(tip[placeTool]);
+        }
       });
     });
     document.getElementById('undoPinBtn').addEventListener('click', undoPin);
@@ -1052,6 +1184,7 @@
     state.job = code;
     selected = null;
     placeTool = null;
+    if (!Array.isArray(state.fleet)) state.fleet = [];
     machineMarkers = {};
     accCircle = null;
     const u = new URL(location.href);
@@ -1099,8 +1232,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v4').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=4')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v5').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=5')).catch(() => {});
   }
 
   function showBootError(msg) {

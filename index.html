@@ -13,34 +13,137 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=4" />
+  <link rel="stylesheet" href="css/app.css?v=5" />
 </head>
 <body>
   <div id="app">
     <div id="map" role="application" aria-label="Jobsite satellite map"></div>
 
     <header id="topbar">
-      <button type="button" id="jobBtn" class="chip job-chip" aria-label="Job code">
-        <span class="chip-kicker">JOB</span>
-        <span id="jobCodeLabel" class="chip-value">----</span>
+      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Machine role">
+        <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
+        <span class="identity-copy">
+          <span class="identity-kicker">I'M THE</span>
+          <span id="roleLabel" class="identity-role">Dozer</span>
+          <span class="identity-sub">OPERATOR</span>
+        </span>
       </button>
-      <button type="button" id="roleBtn" class="chip role-chip role-dozer" aria-label="Machine role">
-        <span id="roleIcon" class="chip-icon" aria-hidden="true"></span>
-        <span id="roleLabel" class="chip-value">Dozer</span>
-      </button>
-      <div class="status-cluster">
+      <div class="identity-meta">
+        <button type="button" id="jobBtn" class="meta-job" aria-label="Job code">
+          <span class="meta-kicker">JOB</span>
+          <span id="jobCodeLabel" class="meta-value">----</span>
+        </button>
         <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
         <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
       </div>
     </header>
 
-    <button type="button" id="basemapBtn" class="fab fab-map" aria-label="Switch map style">MAP</button>
-    <button type="button" id="recenterBtn" class="fab" aria-label="Recenter on machine">
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="4"/>
-        <path d="M24 4v8M24 36v8M4 24h8M36 24h8" stroke="currentColor" stroke-width="4" fill="none"/>
-      </svg>
-    </button>
+    <!-- LEFT: equipment / machine actions -->
+    <aside id="leftRail" class="rail rail-left open" aria-label="Machine tools">
+      <div class="rail-panel">
+        <div class="rail-section" aria-label="Place machine">
+          <span class="rail-label">Machine</span>
+          <button type="button" class="tool tool-machine" data-tool="place-dozer" aria-label="Put a dozer on the map">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="16" width="28" height="12" rx="2" fill="currentColor"/><rect x="4" y="24" width="14" height="6" fill="currentColor"/><circle cx="16" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="34" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Dozer</span>
+          </button>
+          <button type="button" class="tool tool-machine" data-tool="place-excavator" aria-label="Put an excavator on the map">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="18" width="20" height="10" rx="2" fill="currentColor"/><path d="M30 20l14-8-3 10-8 4" fill="currentColor"/><circle cx="18" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="36" r="4" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Excv</span>
+          </button>
+          <button type="button" class="tool tool-machine" data-tool="place-water" aria-label="Put a water truck on the map">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="16" width="14" height="10" rx="2" fill="currentColor"/><ellipse cx="30" cy="22" rx="12" ry="8" fill="currentColor"/><circle cx="12" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Water</span>
+          </button>
+        </div>
+        <div class="rail-section" id="callRow" aria-label="Calls">
+          <span class="rail-label">Call</span>
+          <button type="button" class="tool tool-water" data-tool="water-light" aria-label="Light spray">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M18 20c0-6 6-14 6-14s6 8 6 14a6 6 0 1 1-12 0z" fill="currentColor"/>
+              <circle cx="12" cy="36" r="3" fill="currentColor" opacity=".7"/>
+              <circle cx="24" cy="40" r="2.4" fill="currentColor" opacity=".55"/>
+              <circle cx="36" cy="36" r="3" fill="currentColor" opacity=".7"/>
+            </svg>
+            <span>Light</span>
+          </button>
+          <button type="button" class="tool tool-water-heavy" data-tool="water-heavy" aria-label="Heavy water">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M24 6s14 16 14 24a14 14 0 1 1-28 0C10 22 24 6 24 6z" fill="currentColor"/>
+            </svg>
+            <span>Heavy</span>
+          </button>
+          <button type="button" class="tool tool-cleanup" data-tool="cleanup" aria-label="Cleanup">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M6 30h36l-4 8H10z" fill="currentColor"/>
+              <path d="M10 28l4-12h20l4 12" fill="none" stroke="currentColor" stroke-width="4"/>
+            </svg>
+            <span>Clean</span>
+          </button>
+        </div>
+        <div class="rail-section" id="stakeRow" aria-label="Stakeout">
+          <span class="rail-label">Stake</span>
+          <button type="button" class="tool tool-pin" id="pinBtn" data-tool="corner-pin" aria-label="Drop corner pin at GPS">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M24 4c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="currentColor"/>
+              <circle cx="24" cy="18" r="5" fill="#1c1814"/>
+            </svg>
+            <span>Pin</span>
+            <b id="pinCount" class="count-badge">0</b>
+          </button>
+          <button type="button" class="tool" id="undoPinBtn" aria-label="Undo last pin">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M16 18H8l8-8M8 18c6-10 26-10 32 2" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+              <path d="M14 34h20" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <span>Undo</span>
+          </button>
+          <button type="button" class="tool tool-cut" id="cutBtn" aria-label="Set cut depth">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M8 14h32M8 24h32M8 34h32" stroke="currentColor" stroke-width="3" opacity=".45"/>
+              <path d="M24 8v32M16 28l8 10 8-10" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+            </svg>
+            <span>Cut</span>
+          </button>
+        </div>
+      </div>
+      <button type="button" id="leftRailHandle" class="rail-handle" aria-label="Hide or show machine tools" aria-controls="leftRail" aria-expanded="true">‹</button>
+    </aside>
+
+    <!-- RIGHT: map / site surface tools -->
+    <aside id="rightRail" class="rail rail-right open" aria-label="Site tools">
+      <button type="button" id="rightRailHandle" class="rail-handle" aria-label="Hide or show site tools" aria-controls="rightRail" aria-expanded="true">›</button>
+      <div class="rail-panel">
+        <div class="rail-section" id="surfaceRow" aria-label="Surfaces">
+          <span class="rail-label">Site</span>
+          <button type="button" class="tool" data-tool="pad" aria-label="Pad">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="14" width="32" height="20" rx="2" fill="currentColor"/></svg>
+            <span>Pad</span>
+          </button>
+          <button type="button" class="tool" data-tool="road" aria-label="Road">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="20" width="36" height="8" rx="2" transform="rotate(-18 24 24)" fill="currentColor"/></svg>
+            <span>Road</span>
+          </button>
+          <button type="button" class="tool" data-tool="pile" aria-label="Pile">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="5" fill="currentColor"/></svg>
+            <span>Pile</span>
+          </button>
+        </div>
+        <div class="rail-section rail-map-actions" aria-label="Map controls">
+          <span class="rail-label">Map</span>
+          <button type="button" id="basemapBtn" class="tool tool-map" aria-label="Switch map style">
+            <span class="tool-text-only">MAP</span>
+          </button>
+          <button type="button" id="recenterBtn" class="tool" aria-label="Recenter on machine">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="4"/>
+              <path d="M24 4v8M24 36v8M4 24h8M36 24h8" stroke="currentColor" stroke-width="4" fill="none"/>
+            </svg>
+            <span>Here</span>
+          </button>
+        </div>
+      </div>
+    </aside>
 
     <div id="selectedBar" class="selected-bar" hidden>
       <div id="selectedMeta" class="selected-meta"></div>
@@ -49,71 +152,6 @@
 
     <div id="bootError" class="boot-error" hidden></div>
     <div id="toast" class="toast" hidden></div>
-
-    <nav id="dock" aria-label="Tools">
-      <div class="dock-row" id="surfaceRow">
-        <button type="button" class="tool" data-tool="pad" aria-label="Pad">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="14" width="32" height="20" rx="2" fill="currentColor"/></svg>
-          <span>Pad</span>
-        </button>
-        <button type="button" class="tool" data-tool="road" aria-label="Road">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="20" width="36" height="8" rx="2" transform="rotate(-18 24 24)" fill="currentColor"/></svg>
-          <span>Road</span>
-        </button>
-        <button type="button" class="tool" data-tool="pile" aria-label="Pile">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="5" fill="currentColor"/></svg>
-          <span>Pile</span>
-        </button>
-      </div>
-      <div class="dock-row" id="callRow">
-        <button type="button" class="tool tool-water" data-tool="water-light" aria-label="Light spray">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M18 20c0-6 6-14 6-14s6 8 6 14a6 6 0 1 1-12 0z" fill="currentColor"/>
-            <circle cx="12" cy="36" r="3" fill="currentColor" opacity=".7"/>
-            <circle cx="24" cy="40" r="2.4" fill="currentColor" opacity=".55"/>
-            <circle cx="36" cy="36" r="3" fill="currentColor" opacity=".7"/>
-          </svg>
-          <span>Light</span>
-        </button>
-        <button type="button" class="tool tool-water-heavy" data-tool="water-heavy" aria-label="Heavy water">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M24 6s14 16 14 24a14 14 0 1 1-28 0C10 22 24 6 24 6z" fill="currentColor"/>
-          </svg>
-          <span>Heavy</span>
-        </button>
-        <button type="button" class="tool tool-cleanup" data-tool="cleanup" aria-label="Cleanup">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M6 30h36l-4 8H10z" fill="currentColor"/>
-            <path d="M10 28l4-12h20l4 12" fill="none" stroke="currentColor" stroke-width="4"/>
-          </svg>
-          <span>Clean</span>
-        </button>
-      </div>
-      <div class="dock-row" id="stakeRow">
-        <button type="button" class="tool tool-pin" id="pinBtn" data-tool="corner-pin" aria-label="Drop corner pin at GPS">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M24 4c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z" fill="currentColor"/>
-            <circle cx="24" cy="18" r="5" fill="#1c1814"/>
-          </svg>
-          <span>Pin</span>
-          <b id="pinCount" class="count-badge">0</b>
-        </button>
-        <button type="button" class="tool" id="undoPinBtn" aria-label="Undo last pin">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M16 18H8l8-8M8 18c6-10 26-10 32 2" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-            <path d="M14 34h20" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-          </svg>
-          <span>Undo</span>
-        </button>
-        <button type="button" class="tool tool-cut" id="cutBtn" aria-label="Set cut depth">
-          <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M8 14h32M8 24h32M8 34h32" stroke="currentColor" stroke-width="3" opacity=".45"/>
-            <path d="M24 8v32M16 28l8 10 8-10" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
-          </svg>
-          <span>Cut</span>
-        </button>
-      </div>
-    </nav>
   </div>
 
   <!-- Role sheet -->
@@ -187,6 +225,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>

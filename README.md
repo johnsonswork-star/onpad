@@ -27,12 +27,12 @@ Add to home screen (PWA): Share / Add to Home Screen after it is on HTTPS.
 
 ## How to use
 
-1. Allow GPS. The yellow machine marker is **this phone**. Role defaults to **Dozer**. Switch Dozer / Excavator / Water with the role chip.
-2. **Surfaces** (bottom row): tap Pad / Road / Pile, then tap the satellite to drop. Tap a surface to select it. Fat yellow handles: edge = size, square = rotate. Drag the surface to move. Semi-transparent so imagery stays visible.
-3. **Calls:** Light spray, Heavy water, or Clean — tap the tool, tap the map. Drag the icon to adjust. Tap it → ✓ when done.
-4. **Dig-a-pad stakeout (Dozer):** walk/drive to a pad corner and tap **Pin**. That drops a corner at **current GPS** (not a map tap). Repeat (4 corners is normal; 3 is enough for a triangle). **Undo** pops the last pin. Then **Cut** and enter feet to take off (0.5 / 1.0 / 1.5 or the number pad). That publishes a high-contrast **DIG** polygon with a shovel icon + depth.
+1. Allow GPS. The yellow machine marker is **this phone**. Big top bar = **who you are** (Dozer / Excavator / Water). Tap it to switch role. Job code + GPS + LIVE sit under that identity bar.
+2. **Left rail (Machine):** tuck away with the handle. Place a Dozer / Excavator / Water truck marker (tap tool, tap map). Calls: Light / Heavy / Clean. Dozer stakeout: **Pin** (GPS corner), **Undo**, **Cut**.
+3. **Right rail (Site):** Pad / Road / Pile (tap tool, tap map), plus MAP style and Here (recenter). Fat yellow handles on surfaces: edge = size, square = rotate. Drag to move.
+4. **Dig-a-pad stakeout (Dozer):** walk/drive to a pad corner and tap **Pin** (current GPS, not a map tap). Repeat (4 corners normal; 3+ enough). **Cut** publishes a high-contrast **DIG** polygon with shovel + depth.
 5. **Excavator:** tap the dig pad → ▶ started, ✓ done.
-6. **Job code** (top left): shout this to the other phone. **Join** types the same code. **Share link** copies a URL that restores surfaces / requests / dig pads.
+6. **Job code** (under identity): shout to the other phone. **Join** / **Share link** as before.
 
 v1 GPS is **this phone**, standing in for the dozer’s Trimble. Code hook: `PositionSource.attachTrimble(feed)` in `js/app.js`. Do not fake a Trimble API.
 
