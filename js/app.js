@@ -140,6 +140,41 @@
     return obj;
   }
 
+  /* Optional display name. Rename keeps the SAME auto-minted userId. */
+  function displayName() {
+    try {
+      return (localStorage.getItem('onpad:displayName') || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+  function setDisplayName(name) {
+    const v = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 32);
+    try {
+      if (v) localStorage.setItem('onpad:displayName', v);
+      else localStorage.removeItem('onpad:displayName');
+    } catch (e) { /* quota / private mode */ }
+    return v;
+  }
+  function truncUserId(id) {
+    if (!id) return '';
+    if (id.length <= 12) return id;
+    return id.slice(0, 6) + '\u2026' + id.slice(-4);
+  }
+
+  /* Ban hook only — majority-report ban UI comes later.
+     Reserved: localStorage 'onpad:banned' === '1'  OR  account.accessOk === false.
+     Do NOT gate the map this pass. Do NOT build ban UI. */
+  const account = {
+    get accessOk() {
+      try {
+        return localStorage.getItem('onpad:banned') !== '1';
+      } catch (e) {
+        return true;
+      }
+    }
+  };
+
   function rectCorners(s) {
     const origin = { lat: s.lat, lng: s.lng };
     const hw = s.w / 2, hl = s.l / 2;
@@ -395,8 +430,18 @@
     },
     role() {
       const btn = document.getElementById('roleBtn');
-      btn.className = 'identity role-' + role;
+      const name = displayName();
+      btn.className = 'identity role-' + role + (name ? ' named' : '');
+      const kicker = btn.querySelector('.identity-kicker');
+      const sub = btn.querySelector('.identity-sub');
       document.getElementById('roleLabel').textContent = ROLE_LABEL[role];
+      if (name) {
+        if (kicker) kicker.textContent = name;
+        if (sub) sub.textContent = '';
+      } else {
+        if (kicker) kicker.textContent = "I'M THE";
+        if (sub) sub.textContent = 'OPERATOR';
+      }
       const stake = document.getElementById('stakeRow');
       if (stake) stake.style.display = role === 'dozer' ? 'flex' : 'none';
       document.body.classList.remove('role-dozer', 'role-excavator', 'role-water');
@@ -422,8 +467,28 @@
     }
   };
 
-  function openSheet(id) { document.getElementById(id).hidden = false; }
+  function openSheet(id) {
+    if (id === 'roleSheet') syncProfileSheet();
+    document.getElementById(id).hidden = false;
+  }
   function closeSheet(id) { document.getElementById(id).hidden = true; }
+
+  function syncProfileSheet() {
+    const name = displayName();
+    const input = document.getElementById('displayNameInput');
+    if (input && document.activeElement !== input) input.value = name;
+    const btn = document.getElementById('continueAsBtn');
+    if (btn) btn.textContent = 'Continue as ' + (name || 'Guest');
+    const chip = document.getElementById('userIdChip');
+    if (chip) {
+      const id = localUserId();
+      chip.textContent = truncUserId(id);
+      chip.setAttribute('title', id);
+    }
+    document.querySelectorAll('.role-pick').forEach((b) => {
+      b.classList.toggle('on', b.getAttribute('data-role') === role);
+    });
+  }
 
   /* SVG bits */
   const SVG = {
@@ -1433,10 +1498,43 @@
       b.addEventListener('click', () => {
         role = b.getAttribute('data-role');
         localStorage.setItem('onpad:role', role);
-        closeSheet('roleSheet');
+        syncProfileSheet();
         persist();
       });
     });
+    const nameInput = document.getElementById('displayNameInput');
+    if (nameInput) {
+      const saveName = () => {
+        setDisplayName(nameInput.value);
+        nameInput.value = displayName();
+        syncProfileSheet();
+        ui.role();
+      };
+      nameInput.addEventListener('input', () => {
+        setDisplayName(nameInput.value);
+        const btn = document.getElementById('continueAsBtn');
+        const n = displayName();
+        if (btn) btn.textContent = 'Continue as ' + (n || 'Guest');
+        ui.role();
+      });
+      nameInput.addEventListener('change', saveName);
+      nameInput.addEventListener('blur', saveName);
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          nameInput.blur();
+        }
+      });
+    }
+    const continueBtn = document.getElementById('continueAsBtn');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', () => {
+        if (nameInput) setDisplayName(nameInput.value);
+        syncProfileSheet();
+        ui.role();
+        closeSheet('roleSheet');
+      });
+    }
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
       b.addEventListener('click', () => {
@@ -1511,8 +1609,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v8').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=8')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v9').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=9')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -1528,6 +1626,7 @@
   function boot() {
     try {
       bootFromUrl();
+      localUserId(); /* auto-mint anonymous id; rename never replaces it */
       ui.job();
       ui.role();
       initMap();

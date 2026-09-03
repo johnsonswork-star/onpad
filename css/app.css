@@ -114,6 +114,17 @@ body {
   color: var(--dust);
   opacity: 0.9;
 }
+.identity.named .identity-kicker {
+  color: var(--dust);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 68vw;
+}
+.identity.named .identity-sub { display: none; }
 .role-dozer { color: var(--dozer); border-color: #a88820; }
 .role-excavator { color: var(--excavator); border-color: #a05020; }
 .role-water { color: var(--water-role); border-color: #2a6a90; }
@@ -453,6 +464,60 @@ body.rails-right-open .selected-bar {
   text-transform: uppercase;
 }
 .role-pick svg { width: 72px; height: 48px; }
+.role-pick.on {
+  background: #4a3e24;
+  box-shadow: 0 0 0 3px rgba(245, 213, 71, 0.35);
+}
+.profile-label,
+.profile-section {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 800;
+}
+.profile-section { margin-top: 4px; }
+.name-input {
+  width: 100%;
+  min-height: 56px;
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: #140f0c;
+  color: var(--dust);
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.name-input::placeholder { color: var(--muted); font-weight: 700; letter-spacing: 0.04em; }
+.profile-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 4px;
+}
+.profile-stub .fat.primary { grid-column: auto; }
+.userid-chip {
+  align-self: center;
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--edge);
+  background: var(--dirt-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.profile-hint { margin: 10px 0 0; font-size: 13px; text-align: center; }
 .code-input {
   width: 100%;
   min-height: 64px;
