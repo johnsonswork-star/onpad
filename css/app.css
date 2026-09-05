@@ -1035,3 +1035,56 @@ body.truck-open .rail {
   .tool svg { width: 48px; height: 48px; }
   .identity-role { font-size: 34px; }
 }
+
+/* Google Identity Services — fat outdoor-friendly auth on #roleSheet */
+.google-auth {
+  margin: 4px 0 16px;
+  padding: 12px;
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  background: var(--dirt-2);
+}
+.google-auth .profile-label { margin-bottom: 10px; }
+.google-btn-host {
+  min-height: 56px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.google-btn-host iframe {
+  max-width: 100%;
+}
+.google-signed-in {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.google-signed-in[hidden] { display: none !important; }
+.google-user-chip {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--brass);
+  background: #2a2418;
+  color: var(--dust);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.google-user-chip .google-email {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+}
+.google-auth .fat {
+  text-transform: uppercase;
+}

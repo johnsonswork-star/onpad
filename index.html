@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=19" />
+  <link rel="stylesheet" href="css/app.css?v=20" />
 </head>
 <body>
   <div id="app">
@@ -233,11 +233,19 @@
         <option value="laborer">Laborer</option>
         <option value="fuel">Fuel truck</option>
       </select>
+      <div class="google-auth" id="googleAuthBlock">
+        <label class="profile-label">Google</label>
+        <div id="googleSignInBtn" class="google-btn-host" aria-label="Sign in with Google"></div>
+        <div id="googleSignedIn" class="google-signed-in" hidden>
+          <span id="googleUserChip" class="google-user-chip" title="Signed in with Google"></span>
+          <button type="button" id="googleSignOutBtn" class="fat">Sign out</button>
+        </div>
+      </div>
       <div class="profile-stub">
         <button type="button" id="continueAsBtn" class="fat primary">Continue as dozer operator</button>
-        <span id="userIdChip" class="userid-chip" title="Anonymous id"></span>
+        <span id="userIdChip" class="userid-chip" title="Account id"></span>
       </div>
-      <p class="hint profile-hint">No login. Rename keeps this same id.</p>
+      <p class="hint profile-hint">Optional Google Sign-In. Stamps use your Google id when signed in; rename keeps the active id.</p>
       <button type="button" class="sheet-close" data-close="roleSheet">Close</button>
     </div>
   </div>
@@ -264,6 +272,7 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="js/app.js?v=20"></script>
 </body>
 </html>

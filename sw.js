@@ -1,10 +1,10 @@
-/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=19 profile progress + OnPadAccount) */
-const CACHE = 'onpad-v19';
+/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=20 Google Sign-In + OnPadAccount) */
+const CACHE = 'onpad-v20';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=19',
-  './js/app.js?v=19',
+  './css/app.css?v=20',
+  './js/app.js?v=20',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

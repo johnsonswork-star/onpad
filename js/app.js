@@ -136,8 +136,23 @@
   }
   function now() { return Date.now(); }
 
-  /* Account stamp — anonymous local id for later abuse attribution (no login UI). */
-  function localUserId() {
+  /* Account stamp — Google JWT sub when signed in, else anon local id.
+     Majority-report bans later target Google sub; keep anon id across sign-out. */
+  const GOOGLE_CLIENT_ID = '264054781775-mgh1qesr84ioucojr7mopqknnnj05csr.apps.googleusercontent.com';
+  let googleBtnRendered = false;
+
+  function googleSub() {
+    try { return localStorage.getItem('onpad:googleSub') || ''; } catch (e) { return ''; }
+  }
+  function googleSignedIn() { return !!googleSub(); }
+  function googleName() {
+    try { return (localStorage.getItem('onpad:googleName') || '').trim(); } catch (e) { return ''; }
+  }
+  function googleEmail() {
+    try { return (localStorage.getItem('onpad:googleEmail') || '').trim(); } catch (e) { return ''; }
+  }
+
+  function ensureAnonUserId() {
     try {
       let id = localStorage.getItem('onpad:userId');
       if (!id) {
@@ -148,6 +163,146 @@
     } catch (e) {
       return 'anon-' + uid();
     }
+  }
+
+  function localUserId() {
+    const sub = googleSub();
+    if (sub) return sub;
+    return ensureAnonUserId();
+  }
+
+  function decodeJwtPayload(credential) {
+    try {
+      const parts = String(credential || '').split('.');
+      if (parts.length < 2) return null;
+      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const raw = atob(b64);
+      const json = decodeURIComponent(Array.prototype.map.call(raw, (c) =>
+        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      ).join(''));
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyGoogleCredential(credential) {
+    const payload = decodeJwtPayload(credential);
+    if (!payload || !payload.sub) {
+      ui.toast('Google sign-in failed');
+      return;
+    }
+    ensureAnonUserId(); /* keep anon id for sign-out fallback; do not delete stamps */
+    try {
+      localStorage.setItem('onpad:googleSub', String(payload.sub));
+      if (payload.name) localStorage.setItem('onpad:googleName', String(payload.name).slice(0, 80));
+      else localStorage.removeItem('onpad:googleName');
+      if (payload.email) localStorage.setItem('onpad:googleEmail', String(payload.email).slice(0, 120));
+      else localStorage.removeItem('onpad:googleEmail');
+      if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
+      else localStorage.removeItem('onpad:googlePicture');
+      if (!displayName() && payload.name) setDisplayName(payload.name);
+      localStorage.setItem('onpad:profileReady', '1');
+    } catch (e) { /* quota / private mode */ }
+    publishLocalProfile();
+    syncProfileSheet();
+    persist();
+    ui.role();
+    ui.toast('Signed in with Google');
+  }
+
+  function signOutGoogle() {
+    try {
+      localStorage.removeItem('onpad:googleSub');
+      localStorage.removeItem('onpad:googleName');
+      localStorage.removeItem('onpad:googleEmail');
+      localStorage.removeItem('onpad:googlePicture');
+    } catch (e) {}
+    try {
+      if (window.google && google.accounts && google.accounts.id) {
+        google.accounts.id.disableAutoSelect();
+      }
+    } catch (e) {}
+    googleBtnRendered = false;
+    publishLocalProfile();
+    syncProfileSheet();
+    persist();
+    ui.role();
+    initGoogleSignIn(true);
+    ui.toast('Signed out');
+  }
+
+  function syncGoogleAuthUi() {
+    const host = document.getElementById('googleSignInBtn');
+    const signed = document.getElementById('googleSignedIn');
+    const chip = document.getElementById('googleUserChip');
+    const inGoogle = googleSignedIn();
+    if (host) host.hidden = inGoogle;
+    if (signed) signed.hidden = !inGoogle;
+    if (chip && inGoogle) {
+      const n = googleName() || displayName() || 'Google';
+      const em = googleEmail();
+      chip.textContent = '';
+      const nameEl = document.createElement('span');
+      nameEl.textContent = n;
+      chip.appendChild(nameEl);
+      if (em) {
+        const emEl = document.createElement('span');
+        emEl.className = 'google-email';
+        emEl.textContent = em;
+        chip.appendChild(emEl);
+      }
+      chip.setAttribute('title', em ? (n + ' <' + em + '>') : n);
+    }
+    if (!inGoogle) initGoogleSignIn(false);
+  }
+
+  function initGoogleSignIn(forceRerender) {
+    if (googleSignedIn()) return;
+    const host = document.getElementById('googleSignInBtn');
+    if (!host) return;
+    if (forceRerender) {
+      host.innerHTML = '';
+      googleBtnRendered = false;
+    }
+    function tryRender() {
+      if (!(window.google && google.accounts && google.accounts.id)) return false;
+      try {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (resp) => {
+            if (resp && resp.credential) applyGoogleCredential(resp.credential);
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true
+        });
+        if (!googleBtnRendered || forceRerender || !host.querySelector('iframe, div[role="button"]')) {
+          host.innerHTML = '';
+          const w = Math.max(240, Math.min(400, Math.floor(host.getBoundingClientRect().width || host.parentElement && host.parentElement.clientWidth || 320)));
+          google.accounts.id.renderButton(host, {
+            type: 'standard',
+            theme: 'filled_black',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: w
+          });
+          googleBtnRendered = true;
+        }
+        return true;
+      } catch (e) {
+        console.warn('GIS init', e);
+        return false;
+      }
+    }
+    if (tryRender()) return;
+    let n = 0;
+    const t = setInterval(() => {
+      n += 1;
+      if (tryRender() || n > 60) clearInterval(t);
+    }, 100);
   }
   function stampCore(obj) {
     const id = localUserId();
@@ -283,7 +438,8 @@
   function profileProgress() {
     const nameDone = !!displayName();
     const roleDone = isKnownRole(role);
-    const readyDone = profileReady();
+    /* Signed-in with Google counts as Ready (also set onpad:profileReady on credential). */
+    const readyDone = profileReady() || googleSignedIn();
     const steps = [
       { id: 'name', label: 'Name', done: nameDone },
       { id: 'role', label: 'Role', done: roleDone },
@@ -407,9 +563,9 @@
     return truncUserId(id) || 'Unknown';
   }
 
-  /* Ban hook only — majority-report ban UI comes later.
+  /* Ban hook only — majority-report ban UI comes later (target Google sub).
      Reserved: localStorage 'onpad:banned' === '1'  OR  account.accessOk === false.
-     Do NOT gate the map this pass. Do NOT build ban UI. */
+     Do NOT gate the map this pass. Do NOT build ban UI. Open jobsite: anyone signed in can do everything. */
   const account = {
     get accessOk() {
       try {
@@ -427,6 +583,8 @@
     stamp: (obj) => stampCore(obj),
     lookup: (userId) => lookupProfile(userId),
     profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
+    signedIn: () => googleSignedIn(),
+    signOut: () => signOutGoogle(),
     get STAMP_LOCK_MS() { return STAMP_LOCK_MS; }
   };
 
@@ -759,7 +917,7 @@
     if (chip) {
       const id = localUserId();
       chip.textContent = truncUserId(id);
-      chip.setAttribute('title', id);
+      chip.setAttribute('title', id + (googleSignedIn() ? ' (Google)' : ' (anon)'));
     }
     const op = document.getElementById('opRoleSelect');
     const crew = document.getElementById('crewRoleSelect');
@@ -771,6 +929,7 @@
       crew.value = isMachineRole(role) ? '' : role;
       crew.classList.toggle('is-on', !isMachineRole(role));
     }
+    syncGoogleAuthUi();
     updateProfileProgress();
   }
   function applyRole(next) {
@@ -1947,6 +2106,11 @@
         closeSheet('roleSheet');
       });
     }
+    const googleOut = document.getElementById('googleSignOutBtn');
+    if (googleOut) {
+      googleOut.addEventListener('click', () => signOutGoogle());
+    }
+    initGoogleSignIn(false);
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
       b.addEventListener('click', () => {
@@ -2023,8 +2187,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v19').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=19')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v20').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=20')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -2040,7 +2204,7 @@
   function boot() {
     try {
       bootFromUrl();
-      localUserId(); /* auto-mint anonymous id; rename never replaces it */
+      localUserId(); /* mint anon id; Google sub preferred when signed in */
       if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
       publishLocalProfile();
       persist();
