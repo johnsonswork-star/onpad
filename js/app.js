@@ -303,7 +303,8 @@
       const dragU = localDragWins[x.id];
       /* Last local drag wins for that id unless remote is strictly newer than local */
       if (dragU != null && (cur.u || 0) >= dragU && (x.u || 0) <= (cur.u || 0)) return;
-      if ((x.u || 0) >= (cur.u || 0)) map.set(x.id, x);
+      /* Strict > so equal-u MQTT echo keeps local object (pathDraft / mid-edit refs) */
+      if ((x.u || 0) > (cur.u || 0)) map.set(x.id, x);
     });
     return [...map.values()];
   }
@@ -317,6 +318,7 @@
     state.digPads = mergeById(state.digPads, remote.digPads);
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
     state.paths = mergeById(state.paths || [], remote.paths || []);
+    rebindPathDraft();
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
     const lu = (state.stakeDraft && state.stakeDraft.u) || 0;
     if (ru >= lu) state.stakeDraft = remote.stakeDraft || { pins: [], u: 0 };
@@ -994,8 +996,17 @@
     if (!Array.isArray(state.paths)) state.paths = [];
   }
 
+  function rebindPathDraft() {
+    if (!pathDraft || !pathDraft.id) return;
+    ensurePaths();
+    const cur = state.paths.find((p) => p.id === pathDraft.id && !p.gone);
+    if (cur) pathDraft = cur;
+    else if (pathDraft.gone) pathDraft = null;
+  }
+
   function startPathDraft() {
     ensurePaths();
+    rebindPathDraft();
     if (pathDraft && !pathDraft.gone) {
       placeTool = 'path-draw';
       ui.tools();
@@ -1012,10 +1023,12 @@
     ui.pathHint('Tap map to drop haul points · Done when finished');
     ui.toast('Path started — tap map');
     openTruckBar(true);
-    persist();
+    /* Don't persist empty draft — MQTT echo used to replace the object and orphan pathDraft */
   }
 
   function addPathPoint(latlng) {
+    if (!pathDraft) startPathDraft();
+    rebindPathDraft();
     if (!pathDraft) startPathDraft();
     pathDraft.pts.push({ lat: latlng.lat, lng: latlng.lng });
     pathDraft.u = now();
@@ -1024,6 +1037,7 @@
   }
 
   function undoPathPoint() {
+    rebindPathDraft();
     if (pathDraft && pathDraft.pts.length) {
       pathDraft.pts.pop();
       pathDraft.u = now();
@@ -1050,6 +1064,7 @@
   }
 
   function finishPath() {
+    rebindPathDraft();
     if (!pathDraft || pathDraft.pts.length < 2) {
       ui.toast('Need 2+ points');
       return;
@@ -1097,19 +1112,28 @@
     document.querySelectorAll('.tool-path-tag').forEach((b) => {
       b.classList.toggle('active', b.getAttribute('data-path-tag') === pathTagPending);
     });
+    rebindPathDraft();
+    if (pathTagPending && !pathDraft) {
+      /* OUT/IN alone should start a haul path — truck drivers expect the tool to "do something" */
+      startPathDraft();
+    }
     if (pathDraft) {
       pathDraft.tag = pathTagPending;
-      drawPaths();
-    } else if (selected && selected.kind === 'path') {
-      const p = findById(state.paths, selected.id);
-      if (p) {
+      pathDraft.u = now();
+      /* draft may still be empty — only persist once it has points, else keep tag in memory */
+      if (pathDraft.pts && pathDraft.pts.length) persist();
+      else ui.tools();
+    } else {
+      const live = (state.paths || []).filter((p) => !p.gone);
+      const p = live.length ? live[live.length - 1] : null;
+      if (p && pathTagPending) {
         p.tag = pathTagPending;
         p.u = now();
         persist();
       }
     }
-    ui.toast(pathTagPending === 'in' ? 'Tag: ROAD IN' : pathTagPending === 'out' ? 'Tag: ROAD OUT' : 'Tag cleared');
-    ui.pathHint(pathTagPending === 'in' ? 'Next path = follow road IN' : pathTagPending === 'out' ? 'Next path = follow road OUT' : 'Start a path, tap the map to drop haul points');
+    ui.toast(pathTagPending === 'in' ? 'ROAD IN — tap map for path' : pathTagPending === 'out' ? 'ROAD OUT — tap map for path' : 'Tag cleared');
+    ui.pathHint(pathTagPending === 'in' ? 'IN path: tap map to drop points' : pathTagPending === 'out' ? 'OUT path: tap map to drop points' : 'Start a path, tap the map to drop haul points');
   }
 
   function pathStyle(tag, on, draft) {
@@ -1691,8 +1715,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v14').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=14')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v15').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=15')).catch(() => {});
   }
 
   function showBootError(msg) {
