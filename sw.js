@@ -1,10 +1,10 @@
-/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=13 profile; includes v=12 path-vertex) */
-const CACHE = 'onpad-v13';
+/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=14 tiny map markers) */
+const CACHE = 'onpad-v14';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=13',
-  './js/app.js?v=13',
+  './css/app.css?v=14',
+  './js/app.js?v=14',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

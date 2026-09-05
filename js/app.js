@@ -798,7 +798,7 @@
     const m = L.marker(latlng, {
       draggable: true,
       zIndexOffset: 1200,
-      icon: L.divIcon({ className: 'handle-icon ' + (cls || ''), iconSize: [44, 44], iconAnchor: [22, 22] })
+      icon: L.divIcon({ className: 'handle-icon ' + (cls || ''), iconSize: [28, 28], iconAnchor: [14, 14] })
     }).addTo(handleGroup);
     m.on('dragstart', () => { map.dragging.disable(); editLock = true; });
     m.on('drag', () => onDrag(m.getLatLng()));
@@ -860,8 +860,8 @@
     return L.divIcon({
       className: 'req-icon ' + cls,
       html: svg,
-      iconSize: [56, 56],
-      iconAnchor: [28, 28]
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
     });
   }
 
@@ -924,8 +924,8 @@
   function pinDiv() {
     return L.divIcon({
       className: 'pin-icon',
-      iconSize: [40, 52],
-      iconAnchor: [20, 52],
+      iconSize: [22, 28],
+      iconAnchor: [11, 28],
       html: '<svg viewBox="0 0 40 52"><path d="M20 0C9 0 2 8 2 18c0 12 18 34 18 34s18-22 18-34C38 8 31 0 20 0z" fill="#f5d547" stroke="#111" stroke-width="3"/><circle cx="20" cy="18" r="6" fill="#1c1814"/></svg>'
     });
   }
@@ -972,7 +972,7 @@
       const mid = centroid(d.corners.map((c) => L.latLng(c.lat, c.lng)));
       const html = SVG.shovel + '<span>' + fmtCut(d.cutFt) + '</span>';
       L.marker(mid, {
-        icon: L.divIcon({ className: 'dig-badge ' + d.status, html, iconSize: [90, 40], iconAnchor: [45, 20] }),
+        icon: L.divIcon({ className: 'dig-badge ' + d.status, html, iconSize: [64, 28], iconAnchor: [32, 14] }),
         interactive: false,
         zIndexOffset: 500
       }).addTo(layers.dig);
@@ -1168,8 +1168,8 @@
           icon: L.divIcon({
             className: 'path-tag-label',
             html: (p.tag === 'in' ? 'IN' : 'OUT'),
-            iconSize: [48, 24],
-            iconAnchor: [24, 12]
+            iconSize: [36, 18],
+            iconAnchor: [18, 9]
           })
         }).addTo(layers.paths);
       }
@@ -1177,7 +1177,7 @@
   }
 
   function pathVertexIcon(tag, isEnd) {
-    const size = isEnd ? 20 : 14;
+    const size = isEnd ? 12 : 8;
     const cls = tag === 'in' ? ' tag-in' : tag === 'out' ? ' tag-out' : '';
     return L.divIcon({
       className: 'leaflet-div-icon path-vertex' + cls,
@@ -1227,8 +1227,8 @@
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
     return L.divIcon({
       className: 'fleet-wrap',
-      iconSize: [52, 52],
-      iconAnchor: [26, 26],
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
       html: '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div>'
     });
   }
@@ -1260,8 +1260,8 @@
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
     return L.divIcon({
       className: 'machine-wrap',
-      iconSize: [56, 56],
-      iconAnchor: [28, 28],
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
       html: '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div>'
     });
   }
@@ -1691,8 +1691,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v13').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=13')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v14').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=14')).catch(() => {});
   }
 
   function showBootError(msg) {
