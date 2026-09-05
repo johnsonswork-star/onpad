@@ -150,6 +150,12 @@
     }
   }
   function stamp(obj) {
+    /* Prefer Profile's OnPadAccount API when present (PR #3 / Google later). */
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.stamp === 'function') {
+        return window.OnPadAccount.stamp(obj);
+      }
+    } catch (e) { /* fall through */ }
     const id = localUserId();
     obj.by = id;
     obj.userId = id;
@@ -183,12 +189,19 @@
 
   /* Soft-lock: no edit/delete after 30s from stamp (live path drafts exempt). */
   const STAMP_LOCK_MS = 30000;
+  function stampLockMs() {
+    try {
+      const n = window.OnPadAccount && window.OnPadAccount.STAMP_LOCK_MS;
+      if (typeof n === 'number' && n > 0) return n;
+    } catch (e) {}
+    return STAMP_LOCK_MS;
+  }
   let softLockToastAt = 0;
   function isSoftLocked(item) {
-    if (!item) return false;
-    if (item.draft || (pathDraft && pathDraft.id === item.id)) return false;
+    if (!item || item.draft) return false;
+    if (pathDraft && item.id === pathDraft.id) return false;
     const t = item.stampedAt || 0;
-    return (now() - t) >= STAMP_LOCK_MS;
+    return (now() - t) >= stampLockMs();
   }
   function softLockToast() {
     const t = now();
@@ -197,6 +210,12 @@
     ui.toast('Locked after 30s');
   }
   function placerLabel(item) {
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.profileLabel === 'function') {
+        const label = window.OnPadAccount.profileLabel(item);
+        if (label) return label;
+      }
+    } catch (e) { /* fall through */ }
     if (!item) return '';
     const name = String(item.byName || '').trim();
     const rawRole = String(item.byRole || '').trim();
@@ -1838,8 +1857,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v16').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=16')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v18').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=18')).catch(() => {});
   }
 
   function showBootError(msg) {
