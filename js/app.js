@@ -413,6 +413,11 @@
     onto.byName = from.byName != null ? from.byName : '';
     onto.byRole = from.byRole != null ? from.byRole : '';
     if (from.stampedAt != null) onto.stampedAt = from.stampedAt;
+    if (from.claimedBy != null) onto.claimedBy = from.claimedBy;
+    if (from.byClaimed != null) onto.byClaimed = from.byClaimed;
+    if (from.claimedByName != null) onto.claimedByName = from.claimedByName;
+    if (from.claimedByRole != null) onto.claimedByRole = from.claimedByRole;
+    if (from.claimedAt != null) onto.claimedAt = from.claimedAt;
     return onto;
   }
   function earlierStamp(a, b) {
@@ -1274,11 +1279,40 @@
     persist();
   }
 
-  function reqIcon(kind) {
+  function isOrderClaimed(r) {
+    return !!(r && (r.claimedBy || r.byClaimed));
+  }
+
+  function claimStampOnto(r) {
+    /* Claim identity — same style as place stamp; prefer OnPadAccount when present. */
+    const tmp = stamp({});
+    r.claimedBy = tmp.userId || tmp.by || '';
+    r.byClaimed = r.claimedBy;
+    r.claimedByName = tmp.byName || '';
+    r.claimedByRole = tmp.byRole || '';
+    r.claimedAt = tmp.stampedAt || Date.now();
+    r.u = now();
+    return r;
+  }
+
+  function claimOrder(r) {
+    if (!r || r.gone) return;
+    if (isOrderClaimed(r)) {
+      ui.toast('Already claimed');
+      return;
+    }
+    claimStampOnto(r);
+    persist();
+    select({ kind: 'request', id: r.id });
+    const who = (r.claimedByName || '').trim() || truncUserId(r.claimedBy) || 'you';
+    ui.toast('Claimed · ' + who);
+  }
+
+  function reqIcon(kind, claimed) {
     const cls = kind === 'cleanup' ? 'req-cleanup' : (kind === 'water-heavy' ? 'req-heavy' : 'req-light');
     const svg = kind === 'cleanup' ? SVG.blade : (kind === 'water-heavy' ? SVG.drop : SVG.mist);
     return L.divIcon({
-      className: 'req-icon ' + cls,
+      className: 'req-icon ' + cls + (claimed ? ' claimed' : ''),
       html: svg,
       iconSize: [28, 28],
       iconAnchor: [14, 14]
@@ -1291,7 +1325,12 @@
     state.requests.forEach((r) => {
       if (r.gone) return;
       const locked = isSoftLocked(r);
-      const m = L.marker([r.lat, r.lng], { icon: reqIcon(r.kind), draggable: !locked, zIndexOffset: 400 });
+      const claimed = isOrderClaimed(r);
+      const m = L.marker([r.lat, r.lng], {
+        icon: reqIcon(r.kind, claimed),
+        draggable: !locked,
+        zIndexOffset: claimed ? 380 : 400
+      });
       m.addTo(layers.requests);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'request', id: r.id }); });
       if (locked) {
@@ -1825,8 +1864,22 @@
       const r = findById(state.requests, sel.id);
       if (!r) { bar.hidden = true; return; }
       const label = r.kind === 'cleanup' ? 'CLEAN' : (r.kind === 'water-heavy' ? 'HEAVY' : 'LIGHT');
-      meta.innerHTML = (r.kind === 'cleanup' ? SVG.blade : SVG.drop) +
-        metaWithPlacer('<span>' + label + '</span>', r);
+      const claimed = isOrderClaimed(r);
+      let title = '<span>' + label + (claimed ? ' · CLAIMED' : '') + '</span>';
+      meta.innerHTML = (r.kind === 'cleanup' ? SVG.blade : SVG.drop) + metaWithPlacer(title, r);
+      if (claimed) {
+        const claimWho = (r.claimedByName || '').trim()
+          || (ROLE_LABEL[r.claimedByRole] || r.claimedByRole || '')
+          || truncUserId(r.claimedBy || r.byClaimed)
+          || 'Claimed';
+        const chip = document.createElement('div');
+        chip.className = 'placer-chip claimed-chip';
+        chip.textContent = 'Claimed by ' + claimWho;
+        meta.appendChild(chip);
+      } else {
+        /* Claim stays available even after 30s soft-lock — separate from edit lock */
+        acts.appendChild(actBtn('CLAIM', 'claim', () => claimOrder(r)));
+      }
       acts.appendChild(actBtn('✓', 'ok', () => removeItem(state.requests, r)));
       appendKillOrLock(acts, r, () => removeItem(state.requests, r));
     } else if (sel.kind === 'dig') {
@@ -2187,8 +2240,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v20').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=20')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v21').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=21')).catch(() => {});
   }
 
   function showBootError(msg) {

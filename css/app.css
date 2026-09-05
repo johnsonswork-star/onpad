@@ -873,6 +873,31 @@ body.truck-open .rail {
 .req-light { background: #2a88b0; color: #dff6ff; }
 .req-heavy { background: #0d4a8a; color: #fff; }
 .req-cleanup { background: #c07810; color: #fff6d8; }
+.req-icon.claimed {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  border-style: dashed;
+  box-shadow: none;
+}
+.leaflet-div-icon.req-icon.claimed {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  border-style: dashed !important;
+  box-shadow: none;
+}
+.act.claim {
+  background: var(--safety);
+  color: #1c1814;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  min-width: 72px;
+}
+.claimed-chip {
+  color: var(--safety);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
 
 .pin-icon {
   width: 22px; height: 28px;
@@ -952,6 +977,31 @@ body.truck-open .rail {
 .leaflet-div-icon.req-light { background: #2a88b0; color: #dff6ff; }
 .leaflet-div-icon.req-heavy { background: #0d4a8a; color: #fff; }
 .leaflet-div-icon.req-cleanup { background: #c07810; color: #fff6d8; }
+.req-icon.claimed {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  border-style: dashed;
+  box-shadow: none;
+}
+.leaflet-div-icon.req-icon.claimed {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  border-style: dashed !important;
+  box-shadow: none;
+}
+.act.claim {
+  background: var(--safety);
+  color: #1c1814;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  min-width: 72px;
+}
+.claimed-chip {
+  color: var(--safety);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
 .leaflet-div-icon.dig-badge {
   background: #1c1814ee;
   border: 2px solid var(--dig);
