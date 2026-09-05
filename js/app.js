@@ -153,6 +153,9 @@
     const id = localUserId();
     obj.by = id;
     obj.userId = id;
+    obj.byName = displayName() || '';
+    obj.byRole = role || '';
+    obj.stampedAt = Date.now();
     return obj;
   }
 
@@ -176,6 +179,71 @@
     if (!id) return '';
     if (id.length <= 12) return id;
     return id.slice(0, 6) + '\u2026' + id.slice(-4);
+  }
+
+  /* Soft-lock: no edit/delete after 30s from stamp (live path drafts exempt). */
+  const STAMP_LOCK_MS = 30000;
+  let softLockToastAt = 0;
+  function isSoftLocked(item) {
+    if (!item) return false;
+    if (item.draft || (pathDraft && pathDraft.id === item.id)) return false;
+    const t = item.stampedAt || 0;
+    return (now() - t) >= STAMP_LOCK_MS;
+  }
+  function softLockToast() {
+    const t = now();
+    if (t - softLockToastAt < 2500) return;
+    softLockToastAt = t;
+    ui.toast('Locked after 30s');
+  }
+  function placerLabel(item) {
+    if (!item) return '';
+    const name = String(item.byName || '').trim();
+    const rawRole = String(item.byRole || '').trim();
+    const roleDisp = rawRole ? (ROLE_LABEL[rawRole] || rawRole) : '';
+    if (name && roleDisp) return name + ' · ' + roleDisp;
+    if (roleDisp) return roleDisp;
+    return truncUserId(item.userId || item.by || '');
+  }
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function metaWithPlacer(titleHtml, item) {
+    const who = placerLabel(item);
+    return '<div class="selected-meta-text"><div class="selected-title">' + titleHtml +
+      '</div>' + (who ? '<div class="selected-placer">' + escHtml(who) + '</div>' : '') + '</div>';
+  }
+  function lockNoteEl() {
+    const note = document.createElement('span');
+    note.className = 'lock-note';
+    note.textContent = 'Locked';
+    return note;
+  }
+  function appendKillOrLock(acts, item, onKill) {
+    if (isSoftLocked(item)) acts.appendChild(lockNoteEl());
+    else acts.appendChild(killBtn(onKill));
+  }
+  function preserveStamp(from, onto) {
+    if (!from) return onto;
+    if (!(from.userId || from.by)) return onto;
+    onto.by = from.by;
+    onto.userId = from.userId;
+    onto.byName = from.byName != null ? from.byName : '';
+    onto.byRole = from.byRole != null ? from.byRole : '';
+    if (from.stampedAt != null) onto.stampedAt = from.stampedAt;
+    return onto;
+  }
+  function earlierStamp(a, b) {
+    const aT = a && a.stampedAt;
+    const bT = b && b.stampedAt;
+    if (aT && bT) return aT <= bT ? a : b;
+    if (a && (a.userId || a.by)) return a;
+    if (b && (b.userId || b.by)) return b;
+    return a || b;
   }
 
   /* Ban hook only — majority-report ban UI comes later.
@@ -304,7 +372,12 @@
       /* Last local drag wins for that id unless remote is strictly newer than local */
       if (dragU != null && (cur.u || 0) >= dragU && (x.u || 0) <= (cur.u || 0)) return;
       /* Strict > so equal-u MQTT echo keeps local object (pathDraft / mid-edit refs) */
-      if ((x.u || 0) > (cur.u || 0)) map.set(x.id, x);
+      if ((x.u || 0) > (cur.u || 0)) {
+        const next = Object.assign({}, x);
+        /* Never overwrite original placer identity (userId/by/stampedAt). */
+        preserveStamp(earlierStamp(cur, x), next);
+        map.set(x.id, next);
+      }
     });
     return [...map.values()];
   }
@@ -619,6 +692,14 @@
       attributionControl: true,
       markerZoomAnimation: false
     });
+    try {
+      if (map.zoomControl) map.removeControl(map.zoomControl);
+    } catch (e) {}
+    try {
+      document.querySelectorAll('.leaflet-control-zoom').forEach((el) => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      });
+    } catch (e) {}
 
     let prefer = 'sat';
     try { prefer = localStorage.getItem('onpad:basemap') || 'sat'; } catch (e) {}
@@ -752,7 +833,7 @@
       path.addTo(layers.surfaces);
       surfacePaths[s.id] = { path };
       wirePath(path, { kind: 'surface', id: s.id }, s);
-      if (on) {
+      if (on && !isSoftLocked(s)) {
         if (s.type === 'pile') pileHandles(s);
         else rectHandles(s);
       }
@@ -767,6 +848,7 @@
     let dragging = false, startLL, orig;
     path.on('mousedown', (e) => {
       if (!selected || selected.id !== sel.id) return;
+      if (isSoftLocked(item)) { softLockToast(); return; }
       L.DomEvent.stop(e);
       map.dragging.disable();
       dragging = true;
@@ -872,10 +954,15 @@
     layers.requests.clearLayers();
     state.requests.forEach((r) => {
       if (r.gone) return;
-      const m = L.marker([r.lat, r.lng], { icon: reqIcon(r.kind), draggable: true, zIndexOffset: 400 });
+      const locked = isSoftLocked(r);
+      const m = L.marker([r.lat, r.lng], { icon: reqIcon(r.kind), draggable: !locked, zIndexOffset: 400 });
       m.addTo(layers.requests);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'request', id: r.id }); });
-      wirePixelDrag(m, () => state.requests, r.id);
+      if (locked) {
+        m.on('dragstart', (e) => { L.DomEvent.stop(e); softLockToast(); });
+      } else {
+        wirePixelDrag(m, () => state.requests, r.id);
+      }
     });
   }
 
@@ -1137,16 +1224,19 @@
   }
 
   function pathStyle(tag, on, draft) {
-    let color = '#f5d547';
-    if (tag === 'in') color = '#6ec8ff';
-    if (tag === 'out') color = '#ff9a4a';
+    let color = '#f5d547'; /* untagged = yellow solid */
+    if (tag === 'in') color = '#6ec8ff'; /* IN solid cyan */
+    if (tag === 'out') color = '#ff9a4a'; /* OUT orange dashed always */
+    let dashArray = null;
+    if (tag === 'out') dashArray = '16 10';
+    if (draft) dashArray = '10 12'; /* draft stays dashed translucent */
     return {
       color,
-      weight: on || draft ? 10 : 8,
+      weight: 10,
       opacity: draft ? 0.75 : 0.95,
       lineCap: 'round',
       lineJoin: 'round',
-      dashArray: draft ? '10 12' : null
+      dashArray
     };
   }
 
@@ -1187,13 +1277,14 @@
       });
       if (!draft && p.tag && latlngs.length >= 2) {
         const mid = latlngs[(latlngs.length / 2) | 0];
+        const tagCls = p.tag === 'in' ? ' tag-in' : ' tag-out';
         L.marker(mid, {
           interactive: false,
           icon: L.divIcon({
-            className: 'path-tag-label',
+            className: 'path-tag-label' + tagCls,
             html: (p.tag === 'in' ? 'IN' : 'OUT'),
-            iconSize: [36, 18],
-            iconAnchor: [18, 9]
+            iconSize: [52, 26],
+            iconAnchor: [26, 13]
           })
         }).addTo(layers.paths);
       }
@@ -1221,9 +1312,30 @@
   }
 
   function wirePixelDrag(marker, getArr, id) {
-    marker.on('dragstart', () => { editLock = true; map.dragging.disable(); });
-    marker.on('drag', () => { persistDragLatLng(getArr(), id, marker.getLatLng()); });
+    marker.on('dragstart', (e) => {
+      const item = findById(getArr() || [], id);
+      if (isSoftLocked(item)) {
+        softLockToast();
+        try { marker.setLatLng([item.lat, item.lng]); } catch (err) {}
+        if (e && e.target && e.target.dragging) e.target.dragging.disable();
+        return;
+      }
+      editLock = true;
+      map.dragging.disable();
+    });
+    marker.on('drag', () => {
+      const item = findById(getArr() || [], id);
+      if (isSoftLocked(item)) return;
+      persistDragLatLng(getArr(), id, marker.getLatLng());
+    });
     marker.on('dragend', () => {
+      const item = findById(getArr() || [], id);
+      if (isSoftLocked(item)) {
+        editLock = false;
+        map.dragging.enable();
+        try { marker.setLatLng([item.lat, item.lng]); } catch (err) {}
+        return;
+      }
       persistDragLatLng(getArr(), id, marker.getLatLng());
       editLock = false;
       map.dragging.enable();
@@ -1264,13 +1376,18 @@
     (state.fleet || []).forEach((f) => {
       if (f.gone || f.lat == null) return;
       const on = selected && selected.kind === 'fleet' && selected.id === f.id;
+      const locked = isSoftLocked(f);
       const m = L.marker([f.lat, f.lng], {
         icon: fleetIcon(f.role, on),
         zIndexOffset: 700,
-        draggable: true
+        draggable: !locked
       }).addTo(layers.fleet);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
-      wirePixelDrag(m, () => state.fleet, f.id);
+      if (locked) {
+        m.on('dragstart', (e) => { L.DomEvent.stop(e); softLockToast(); });
+      } else {
+        wirePixelDrag(m, () => state.fleet, f.id);
+      }
     });
   }
 
@@ -1364,37 +1481,43 @@
     if (sel.kind === 'surface') {
       const s = findById(state.surfaces, sel.id);
       if (!s) { bar.hidden = true; return; }
-      meta.innerHTML = (s.type === 'pad' ? 'PAD' : s.type === 'road' ? 'ROAD' : 'PILE');
-      acts.appendChild(killBtn(() => removeItem(state.surfaces, s)));
+      meta.innerHTML = metaWithPlacer(
+        (s.type === 'pad' ? 'PAD' : s.type === 'road' ? 'ROAD' : 'PILE'), s
+      );
+      appendKillOrLock(acts, s, () => removeItem(state.surfaces, s));
     } else if (sel.kind === 'request') {
       const r = findById(state.requests, sel.id);
       if (!r) { bar.hidden = true; return; }
       const label = r.kind === 'cleanup' ? 'CLEAN' : (r.kind === 'water-heavy' ? 'HEAVY' : 'LIGHT');
-      meta.innerHTML = (r.kind === 'cleanup' ? SVG.blade : SVG.drop) + '<span>' + label + '</span>';
+      meta.innerHTML = (r.kind === 'cleanup' ? SVG.blade : SVG.drop) +
+        metaWithPlacer('<span>' + label + '</span>', r);
       acts.appendChild(actBtn('✓', 'ok', () => removeItem(state.requests, r)));
-      acts.appendChild(killBtn(() => removeItem(state.requests, r)));
+      appendKillOrLock(acts, r, () => removeItem(state.requests, r));
     } else if (sel.kind === 'dig') {
       const d = findById(state.digPads, sel.id);
       if (!d) { bar.hidden = true; return; }
-      meta.innerHTML = SVG.shovel + '<span>' + fmtCut(d.cutFt) + '</span>';
+      meta.innerHTML = SVG.shovel + metaWithPlacer('<span>' + fmtCut(d.cutFt) + '</span>', d);
       if (d.status !== 'started' && d.status !== 'done') {
         acts.appendChild(actBtn('▶', 'dig', () => { d.status = 'started'; d.u = now(); persist(); select(sel); }));
       }
       if (d.status !== 'done') {
         acts.appendChild(actBtn('✓', 'ok', () => { d.status = 'done'; d.u = now(); persist(); select(sel); }));
       }
-      if (role === 'dozer') acts.appendChild(killBtn(() => removeItem(state.digPads, d)));
+      if (role === 'dozer') appendKillOrLock(acts, d, () => removeItem(state.digPads, d));
     } else if (sel.kind === 'fleet') {
       const f = findById(state.fleet || [], sel.id);
       if (!f) { bar.hidden = true; return; }
-      meta.innerHTML = roleSvg(f.role) + '<span>' + (ROLE_LABEL[f.role] || f.role).toUpperCase() + '</span>';
-      acts.appendChild(killBtn(() => removeItem(state.fleet, f)));
+      meta.innerHTML = roleSvg(f.role) +
+        metaWithPlacer('<span>' + (ROLE_LABEL[f.role] || f.role).toUpperCase() + '</span>', f);
+      appendKillOrLock(acts, f, () => removeItem(state.fleet, f));
     } else if (sel.kind === 'path') {
       const p = findById(state.paths || [], sel.id);
       if (!p) { bar.hidden = true; return; }
       const tag = p.tag === 'in' ? ' IN' : p.tag === 'out' ? ' OUT' : '';
-      meta.innerHTML = '<span>HAUL' + tag + ' · ' + (p.pts || []).length + ' pts</span>';
-      acts.appendChild(killBtn(() => removeItem(state.paths, p)));
+      meta.innerHTML = metaWithPlacer(
+        '<span>HAUL' + tag + ' · ' + (p.pts || []).length + ' pts</span>', p
+      );
+      appendKillOrLock(acts, p, () => removeItem(state.paths, p));
     }
   }
 
@@ -1715,8 +1838,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v15').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=15')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v16').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=16')).catch(() => {});
   }
 
   function showBootError(msg) {

@@ -31,12 +31,12 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 ## Sync
 
 - State is saved in `localStorage` for the shared site room.
-- Created features carry optional `by` / `userId` (anonymous local id) so abuse can be attributed later. No login / report / ban UI yet.
+- Created features carry a profile stamp: `by` / `userId`, `byName`, `byRole`, `stampedAt` (Profile & Settings). Soft-lock after 30s. No login / report / ban UI yet.
 - **Live (best-effort):** MQTT room `onpad/v1/SITE` on public brokers. Badge **LIVE** / **SOLO**. Obscure room, not private.
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=15`, service worker `onpad-v15`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=16`, service worker `onpad-v16`).
 
 ## Stack
 

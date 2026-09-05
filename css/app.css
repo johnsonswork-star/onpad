@@ -61,7 +61,8 @@ body {
   margin: 0 6px 4px 0 !important;
 }
 .leaflet-control-attribution a { color: #c4b49a !important; }
-.leaflet-control-zoom { display: none; }
+.leaflet-control-zoom { display: none !important; }
+.leaflet-top.leaflet-left .leaflet-control-zoom { display: none !important; }
 /* Above truck handle; z-index under truck/selected so it cannot cover TRUCK PATHS */
 .leaflet-bottom {
   bottom: calc(var(--truck-handle-h, 58px) + 8px + var(--safe-b));
@@ -380,7 +381,39 @@ body.rails-right-open .selected-bar {
   min-width: 0;
 }
 .selected-meta svg { width: 32px; height: 32px; flex: 0 0 auto; }
-.selected-actions { display: flex; gap: 6px; }
+.selected-meta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.15;
+}
+.selected-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.selected-placer {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lock-note {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.selected-actions { display: flex; gap: 6px; align-items: center; }
 .act {
   min-width: 56px; min-height: 52px;
   border-radius: 10px;
@@ -705,12 +738,21 @@ body.truck-open .rail {
   border: 2px solid var(--safety);
   color: var(--safety);
   font-weight: 900;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  padding: 1px 6px;
-  border-radius: 6px;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  padding: 3px 10px;
+  border-radius: 8px;
   text-align: center;
   box-shadow: var(--shadow);
+  line-height: 1.2;
+}
+.path-tag-label.tag-in {
+  border-color: #6ec8ff;
+  color: #6ec8ff;
+}
+.path-tag-label.tag-out {
+  border-color: #ff9a4a;
+  color: #ff9a4a;
 }
 .path-vertex {
   width: 100%;
@@ -850,6 +892,14 @@ body.truck-open .rail {
   background: #1c1814ee;
   border: 2px solid var(--safety);
   color: var(--safety);
+}
+.leaflet-div-icon.path-tag-label.tag-in {
+  border-color: #6ec8ff;
+  color: #6ec8ff;
+}
+.leaflet-div-icon.path-tag-label.tag-out {
+  border-color: #ff9a4a;
+  color: #ff9a4a;
 }
 .leaflet-div-icon.handle-icon {
   background: var(--safety);
