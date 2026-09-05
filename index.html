@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=18" />
+  <link rel="stylesheet" href="css/app.css?v=19" />
 </head>
 <body>
   <div id="app">
@@ -199,6 +199,20 @@
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
       <h2>Profile</h2>
+      <div class="profile-progress" id="profileProgress" aria-live="polite">
+        <div class="profile-progress-top">
+          <span class="profile-progress-label" id="profileProgressLabel">Profile 0/3</span>
+          <span class="profile-progress-pct" id="profileProgressPct">0%</span>
+        </div>
+        <div class="profile-progress-track" id="profileProgressBar" role="progressbar" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" aria-labelledby="profileProgressLabel">
+          <div class="profile-progress-fill" id="profileProgressFill" style="width:0%"></div>
+        </div>
+        <ul class="profile-progress-steps" id="profileProgressSteps">
+          <li data-step="name">Name</li>
+          <li data-step="role">Role</li>
+          <li data-step="ready">Ready</li>
+        </ul>
+      </div>
       <label class="profile-label" for="displayNameInput">Display name</label>
       <input id="displayNameInput" class="name-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Optional" enterkeyhint="done" />
       <label class="profile-label" for="opRoleSelect">Operators</label>
@@ -250,6 +264,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>

@@ -36,7 +36,33 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=18`, service worker `onpad-v18`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=19`, service worker `onpad-v19`).
+
+
+## Profile stamp API (App Builder)
+
+Settings owns the Profile sheet progress meter (Name · Role · Ready). Map permanence is **App Builder’s** job.
+
+Features stamped via `stamp()` / `OnPadAccount.stamp(obj)` carry:
+
+- `by` / `userId` — anonymous local account id
+- `byName` / `byRole` — display name + role at stamp time
+- `stampedAt` — epoch ms (Builder: soft-lock / permanence after **30s**)
+
+Live registry: `state.profiles[userId] = { userId, name, role, u }` (synced in slim MQTT state; merge keeps newest `u`).
+
+```js
+window.OnPadAccount = {
+  userId: () => /* local id */,
+  profile: () => ({ userId, name, role }),
+  stamp: (obj) => /* mutates + returns obj */,
+  lookup: (userId) => /* from state.profiles or feature byName fallback */,
+  profileLabel: (userIdOrFeature) => /* "Name · Role" or truncated id */,
+  STAMP_LOCK_MS: 30000 // documented constant — Builder implements the 30s lock
+};
+```
+
+Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock using `stampedAt` + `STAMP_LOCK_MS`.
 
 ## Stack
 

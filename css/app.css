@@ -591,6 +591,77 @@ body.rails-right-open .selected-bar {
   font-variant-numeric: tabular-nums;
 }
 .profile-hint { margin: 10px 0 0; font-size: 13px; text-align: center; }
+
+/* Profile setup progress — fat outdoor-friendly meter on #roleSheet */
+.profile-progress {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  background: #140f0c;
+}
+.profile-progress-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.profile-progress-label {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dust);
+}
+.profile-progress-pct {
+  font-size: 28px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--brass);
+  letter-spacing: 0.02em;
+}
+.profile-progress-track {
+  height: 22px;
+  border-radius: 999px;
+  border: 3px solid var(--edge);
+  background: var(--dirt-2);
+  overflow: hidden;
+}
+.profile-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8a7018, var(--brass), #f0d060);
+  transition: width 0.2s ease-out;
+}
+.profile-progress-steps {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.profile-progress-steps li {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 2px solid var(--edge);
+  background: var(--dirt-2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.profile-progress-steps li.done {
+  border-color: var(--brass);
+  background: #2a2418;
+  color: var(--brass);
+}
 .code-input {
   width: 100%;
   min-height: 64px;

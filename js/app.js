@@ -149,13 +149,7 @@
       return 'anon-' + uid();
     }
   }
-  function stamp(obj) {
-    /* Prefer Profile's OnPadAccount API when present (PR #3 / Google later). */
-    try {
-      if (window.OnPadAccount && typeof window.OnPadAccount.stamp === 'function') {
-        return window.OnPadAccount.stamp(obj);
-      }
-    } catch (e) { /* fall through */ }
+  function stampCore(obj) {
     const id = localUserId();
     obj.by = id;
     obj.userId = id;
@@ -163,6 +157,16 @@
     obj.byRole = role || '';
     obj.stampedAt = Date.now();
     return obj;
+  }
+  function stamp(obj) {
+    /* Prefer Profile's OnPadAccount API when present (Google later). */
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.stamp === 'function'
+          && window.OnPadAccount.stamp !== stamp) {
+        return window.OnPadAccount.stamp(obj);
+      }
+    } catch (e) { /* fall through */ }
+    return stampCore(obj);
   }
 
   /* Optional display name. Rename keeps the SAME auto-minted userId. */
@@ -200,13 +204,13 @@
   function isSoftLocked(item) {
     if (!item || item.draft) return false;
     if (pathDraft && item.id === pathDraft.id) return false;
-    const t = item.stampedAt || 0;
-    return (now() - t) >= stampLockMs();
+    const t0 = item.stampedAt || 0;
+    return (now() - t0) >= stampLockMs();
   }
   function softLockToast() {
-    const t = now();
-    if (t - softLockToastAt < 2500) return;
-    softLockToastAt = t;
+    const t0 = now();
+    if (t0 - softLockToastAt < 2500) return;
+    softLockToastAt = t0;
     ui.toast('Locked after 30s');
   }
   function placerLabel(item) {
@@ -265,6 +269,144 @@
     return a || b;
   }
 
+  function profileReady() {
+    try {
+      return localStorage.getItem('onpad:profileReady') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+  function markProfileReady() {
+    try { localStorage.setItem('onpad:profileReady', '1'); } catch (e) { /* ignore */ }
+  }
+
+  function profileProgress() {
+    const nameDone = !!displayName();
+    const roleDone = isKnownRole(role);
+    const readyDone = profileReady();
+    const steps = [
+      { id: 'name', label: 'Name', done: nameDone },
+      { id: 'role', label: 'Role', done: roleDone },
+      { id: 'ready', label: 'Ready', done: readyDone }
+    ];
+    const done = steps.filter((s) => s.done).length;
+    return { done, total: 3, steps, pct: Math.round((done / 3) * 100) };
+  }
+
+  function updateProfileProgress() {
+    const p = profileProgress();
+    const label = document.getElementById('profileProgressLabel');
+    const pct = document.getElementById('profileProgressPct');
+    const bar = document.getElementById('profileProgressBar');
+    const fill = document.getElementById('profileProgressFill');
+    const list = document.getElementById('profileProgressSteps');
+    if (label) label.textContent = 'Profile ' + p.done + '/' + p.total;
+    if (pct) pct.textContent = p.pct + '%';
+    if (bar) bar.setAttribute('aria-valuenow', String(p.done));
+    if (fill) fill.style.width = p.pct + '%';
+    if (list) {
+      list.querySelectorAll('[data-step]').forEach((li) => {
+        const step = p.steps.find((s) => s.id === li.getAttribute('data-step'));
+        li.classList.toggle('done', !!(step && step.done));
+      });
+    }
+  }
+
+  function ensureProfiles() {
+    if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
+    return state.profiles;
+  }
+
+  function publishLocalProfile() {
+    const id = localUserId();
+    const profiles = ensureProfiles();
+    profiles[id] = {
+      userId: id,
+      name: displayName() || '',
+      role: role,
+      u: now()
+    };
+  }
+
+  function mergeProfiles(localMap, remoteMap) {
+    const out = Object.assign({}, localMap || {});
+    Object.keys(remoteMap || {}).forEach((id) => {
+      const r = remoteMap[id];
+      if (!r || typeof r !== 'object') return;
+      const cur = out[id];
+      if (!cur || (r.u || 0) >= (cur.u || 0)) {
+        out[id] = {
+          userId: r.userId || id,
+          name: r.name || '',
+          role: r.role || '',
+          u: r.u || 0
+        };
+      }
+    });
+    return out;
+  }
+
+  function lookupProfile(userId) {
+    if (!userId) return null;
+    const reg = state.profiles && state.profiles[userId];
+    if (reg) {
+      return {
+        userId: reg.userId || userId,
+        name: reg.name || '',
+        role: reg.role || '',
+        u: reg.u || 0
+      };
+    }
+    /* Fallback: newest stamped feature fields for this id */
+    let best = null;
+    const bags = [state.surfaces, state.requests, state.digPads, state.fleet, state.paths];
+    bags.forEach((arr) => {
+      (arr || []).forEach((f) => {
+        if (!f) return;
+        const fid = f.userId || f.by;
+        if (fid !== userId) return;
+        const t = f.stampedAt || f.u || 0;
+        if (!best || t >= (best.stampedAt || 0)) {
+          best = {
+            userId: userId,
+            name: f.byName || '',
+            role: f.byRole || '',
+            stampedAt: t
+          };
+        }
+      });
+    });
+    return best ? { userId: best.userId, name: best.name, role: best.role, u: best.stampedAt || 0 } : null;
+  }
+
+  function profileLabel(userIdOrFeature) {
+    let id = '';
+    let name = '';
+    let roleKey = '';
+    if (userIdOrFeature && typeof userIdOrFeature === 'object') {
+      id = userIdOrFeature.userId || userIdOrFeature.by || '';
+      name = userIdOrFeature.byName || userIdOrFeature.name || '';
+      roleKey = userIdOrFeature.byRole || userIdOrFeature.role || '';
+      const p = lookupProfile(id);
+      if (p) {
+        if (!name) name = p.name || '';
+        if (!roleKey) roleKey = p.role || '';
+      }
+    } else {
+      id = userIdOrFeature || '';
+      const p = lookupProfile(id);
+      if (p) {
+        name = p.name || '';
+        roleKey = p.role || '';
+      }
+    }
+    const roleText = ROLE_LABEL[roleKey] || roleKey || '';
+    if (name && roleText) return name + ' · ' + roleText;
+    if (name) return name;
+    if (roleText) return roleText;
+    return truncUserId(id) || 'Unknown';
+  }
+
   /* Ban hook only — majority-report ban UI comes later.
      Reserved: localStorage 'onpad:banned' === '1'  OR  account.accessOk === false.
      Do NOT gate the map this pass. Do NOT build ban UI. */
@@ -276,6 +418,16 @@
         return true;
       }
     }
+  };
+
+  /* Global API for App Builder (map tap-chip + 30s soft-lock). Settings owns progress UI. */
+  window.OnPadAccount = {
+    userId: () => localUserId(),
+    profile: () => ({ userId: localUserId(), name: displayName(), role }),
+    stamp: (obj) => stampCore(obj),
+    lookup: (userId) => lookupProfile(userId),
+    profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
+    get STAMP_LOCK_MS() { return STAMP_LOCK_MS; }
   };
 
   function rectCorners(s) {
@@ -333,6 +485,7 @@
       paths: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
+      profiles: {},
       u: now()
     };
   }
@@ -359,6 +512,7 @@
         if (s && s.v === VERSION) {
           if (!Array.isArray(s.fleet)) s.fleet = [];
           if (!Array.isArray(s.paths)) s.paths = [];
+          if (!s.profiles || typeof s.profiles !== 'object') s.profiles = {};
           return s;
         }
       }
@@ -377,6 +531,7 @@
       paths: state.paths || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
+      profiles: state.profiles || {},
       u: state.u
     };
   }
@@ -410,6 +565,7 @@
     state.digPads = mergeById(state.digPads, remote.digPads);
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
     state.paths = mergeById(state.paths || [], remote.paths || []);
+    state.profiles = mergeProfiles(state.profiles || {}, remote.profiles || {});
     rebindPathDraft();
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
     const lu = (state.stakeDraft && state.stakeDraft.u) || 0;
@@ -615,11 +771,13 @@
       crew.value = isMachineRole(role) ? '' : role;
       crew.classList.toggle('is-on', !isMachineRole(role));
     }
+    updateProfileProgress();
   }
   function applyRole(next) {
     if (!isKnownRole(next)) return;
     role = next;
     try { localStorage.setItem('onpad:role', role); } catch (e) {}
+    publishLocalProfile();
     syncProfileSheet();
     persist();
     ui.role();
@@ -1755,7 +1913,9 @@
       const saveName = () => {
         setDisplayName(nameInput.value);
         nameInput.value = displayName();
+        publishLocalProfile();
         syncProfileSheet();
+        persist();
         ui.role();
       };
       nameInput.addEventListener('input', () => {
@@ -1763,6 +1923,7 @@
         const btn = document.getElementById('continueAsBtn');
         const n = displayName();
         if (btn) btn.textContent = continueAsLabel(n);
+        updateProfileProgress();
         ui.role();
       });
       nameInput.addEventListener('change', saveName);
@@ -1778,7 +1939,10 @@
     if (continueBtn) {
       continueBtn.addEventListener('click', () => {
         if (nameInput) setDisplayName(nameInput.value);
+        markProfileReady();
+        publishLocalProfile();
         syncProfileSheet();
+        persist();
         ui.role();
         closeSheet('roleSheet');
       });
@@ -1807,6 +1971,7 @@
     pathDraft = null;
     if (!Array.isArray(state.fleet)) state.fleet = [];
     if (!Array.isArray(state.paths)) state.paths = [];
+    if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     machineMarkers = {};
     accCircle = null;
     const u = new URL(location.href);
@@ -1827,6 +1992,7 @@
     state = loadJob(code, emptyState(code));
     state.job = code;
     if (!Array.isArray(state.paths)) state.paths = [];
+    if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     if (snap) applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
     /* strip legacy job codes / snapshots from the URL so drivers see a clean link */
     if (u.searchParams.has('job') || u.hash) {
@@ -1857,8 +2023,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v18').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=18')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v19').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=19')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -1875,6 +2041,10 @@
     try {
       bootFromUrl();
       localUserId(); /* auto-mint anonymous id; rename never replaces it */
+      if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
+      publishLocalProfile();
+      persist();
+      updateProfileProgress();
       ui.job();
       ui.role();
       initMap();
