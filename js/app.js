@@ -2254,8 +2254,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v22').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=22')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v23').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=23')).catch(() => {});
   }
 
   function showBootError(msg) {
