@@ -978,7 +978,7 @@
   }
   function modGrantLikes(item) {
     if (!item || item.gone) return;
-    if (!myIsMod()) { ui.toast('Mods only'); return; }
+    if (!myIsMod() || !modToolsOn()) { ui.toast(myIsMod() ? 'Turn Mod tools on' : 'Mods only'); return; }
     const me = currentUserId();
     if (!me) { ui.toast('Sign in'); return; }
     let raw = '10';
@@ -1039,6 +1039,11 @@
     }
     item.u = now();
     persist();
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.refreshRatedHistory === 'function') {
+        window.OnPadAccount.refreshRatedHistory(ownerIdOf(item));
+      }
+    } catch (e) {}
   }
   function toggleDislike(item) {
     if (!item || item.gone) return;
@@ -1049,10 +1054,23 @@
     const li = voteIndex(likes, me);
     if (li >= 0) likes.splice(li, 1);
     const i = voteIndex(dislikes, me);
-    if (i >= 0) dislikes.splice(i, 1);
-    else dislikes.push({ by: me, at: Date.now() });
+    if (i >= 0) {
+      dislikes.splice(i, 1);
+    } else {
+      dislikes.push({ by: me, at: Date.now() });
+      try {
+        if (window.OnPadAccount && typeof window.OnPadAccount.recordDislike === 'function') {
+          window.OnPadAccount.recordDislike(item.id, ownerIdOf(item));
+        }
+      } catch (e) {}
+    }
     item.u = now();
     persist();
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.refreshRatedHistory === 'function') {
+        window.OnPadAccount.refreshRatedHistory(ownerIdOf(item));
+      }
+    } catch (e) {}
   }
   function reportItem(arr, item) {
     if (!item || item.gone) return;
@@ -1070,6 +1088,7 @@
       forceRemove(arr, item);
       return;
     }
+    try { enqueueReport(item.id, me); } catch (e) {}
     persist();
     ui.toast('Reported — L3+ review queue');
     select(selected);
@@ -1132,7 +1151,7 @@
     acts.appendChild(likeB);
     acts.appendChild(disB);
     acts.appendChild(repB);
-    if (myIsMod()) {
+    if (myIsMod() && modToolsOn()) {
       acts.appendChild(actBtn('+LIKES', 'social grant', () => {
         modGrantLikes(item);
         select(selected);
@@ -1248,8 +1267,11 @@
           userId: r.userId || id,
           name: r.name || '',
           role: r.role || '',
+          ratedHistory: Array.isArray(r.ratedHistory) ? r.ratedHistory : (cur && cur.ratedHistory) || [],
           u: r.u || 0
         };
+      } else if (cur && Array.isArray(r.ratedHistory) && r.ratedHistory.length && (!cur.ratedHistory || !cur.ratedHistory.length)) {
+        cur.ratedHistory = r.ratedHistory;
       }
     });
     return out;
@@ -1545,8 +1567,8 @@
 
   /* Mods-only: grant n likes for featureId→target. Idempotent per featureId+target (no double-count). */
   function grantLikes(featureId, targetUserId, n) {
-    if (!myIsMod()) {
-      try { ui.toast('Mods only'); } catch (e) {}
+    if (!myIsMod() || !modToolsOn()) {
+      try { ui.toast(myIsMod() ? 'Turn Mod tools on' : 'Mods only'); } catch (e) {}
       return false;
     }
     const fid = String(featureId || '').trim();
@@ -1630,6 +1652,12 @@
   function syncRoleBadgeUi() {
     const badge = document.getElementById('profileRoleBadge');
     if (!badge) return;
+    /* Stealth: no staff badge unless this session has Mod tools on. */
+    if (!modToolsOn()) {
+      badge.hidden = true;
+      badge.textContent = '';
+      return;
+    }
     const viewId = viewingUserId || localUserId();
     if (isFounder(viewId)) {
       badge.hidden = false;
@@ -1666,6 +1694,7 @@
         if (nameEl) nameEl.textContent = disp.name;
         if (roleEl) roleEl.textContent = disp.roleLabel ? ('Role · ' + disp.roleLabel) : 'Role · —';
         if (levelEl) {
+          levelEl.hidden = true;
           levelEl.textContent = 'Level L' + lv + ' · ' + likes + ' likes · ' + dislikes + ' dislikes';
           levelEl.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
         }
@@ -1682,13 +1711,16 @@
             syncViewedProfileUi();
           });
         }
-        /* Mod grant likes controls — mod-only */
+        const toolsOn = myIsMod() && modToolsOn();
+        const modTools = document.getElementById('viewedModTools');
+        if (modTools) modTools.hidden = !toolsOn;
         const grantWrap = document.getElementById('viewedGrantLikes');
-        if (grantWrap) {
-          grantWrap.hidden = !myIsMod();
-        }
+        if (grantWrap) grantWrap.hidden = !toolsOn;
       }
     }
+    syncProfileScoreHeader();
+    syncRestrictionHistoryUi();
+    syncModToolsUi();
     syncRoleBadgeUi();
     syncModsUi();
     syncNearbyUsersUi();
@@ -1710,7 +1742,8 @@
       btn.type = 'button';
       btn.className = 'fat nearby-user-btn';
       const roleDisp = u.role ? (ROLE_LABEL[u.role] || u.role) : '';
-      const label = (u.name || truncUserId(u.userId)) + (roleDisp ? (' · ' + roleDisp) : '');
+      const score = accountScoreFormat(u.userId);
+      const label = (u.name || truncUserId(u.userId)) + (roleDisp ? (' · ' + roleDisp) : '') + ' · ' + score;
       btn.textContent = label;
       btn.setAttribute('title', u.userId);
       btn.addEventListener('click', () => { openProfile(u.userId); });
@@ -1791,7 +1824,413 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* Unique like events on target's stamps: unique by+featureId (feature.likes + registry). */
+  /* ---- SITE OPS ?v=39: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
+  const MS_24H = 24 * 60 * 60 * 1000;
+  const RESTRICT_ACTIONS = {
+    warn: 'Warn',
+    mute: 'Mute',
+    tool: 'Tool restrict',
+    movement: 'Movement restrict',
+    kick: 'Kick',
+    tempban: 'Temp ban',
+    ban: 'Ban'
+  };
+
+  function modToolsOn() {
+    try { return sessionStorage.getItem(MOD_TOOLS_SESSION_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setModToolsOn(on) {
+    try {
+      if (on) sessionStorage.setItem(MOD_TOOLS_SESSION_KEY, '1');
+      else sessionStorage.removeItem(MOD_TOOLS_SESSION_KEY);
+    } catch (e) {}
+    try { syncModToolsUi(); } catch (e) {}
+    try { syncRoleBadgeUi(); } catch (e) {}
+    try { syncViewedProfileUi(); } catch (e) {}
+    try { select(selected); } catch (e) {}
+  }
+  function syncModToolsUi() {
+    const bar = document.getElementById('modToolsBar');
+    const toggle = document.getElementById('modToolsToggle');
+    const chip = document.getElementById('modToolsChip');
+    const can = myIsMod();
+    const viewingOther = !!(viewingUserId && viewingUserId !== localUserId());
+    if (bar) bar.hidden = !can || viewingOther;
+    if (toggle) {
+      const on = modToolsOn();
+      toggle.textContent = on ? 'Mod tools · ON' : 'Mod tools';
+      toggle.classList.toggle('primary', on);
+      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    if (chip) chip.hidden = !(can && modToolsOn());
+  }
+
+  function ensureRestrictions() {
+    if (!state.restrictions || typeof state.restrictions !== 'object') state.restrictions = {};
+    return state.restrictions;
+  }
+  function mergeRestrictions(localMap, remoteMap) {
+    const out = Object.assign({}, localMap || {});
+    Object.keys(remoteMap || {}).forEach((uid) => {
+      const remoteList = Array.isArray(remoteMap[uid]) ? remoteMap[uid] : [];
+      const localList = Array.isArray(out[uid]) ? out[uid] : [];
+      const map = new Map();
+      localList.concat(remoteList).forEach((r) => {
+        if (!r || !r.action) return;
+        const key = String(r.action) + '|' + String(r.by || '') + '|' + String(r.at || 0);
+        const cur = map.get(key);
+        if (!cur || (r.at || 0) >= (cur.at || 0)) {
+          map.set(key, {
+            action: String(r.action),
+            by: r.by ? String(r.by) : '',
+            at: r.at || 0,
+            reason: r.reason ? String(r.reason).slice(0, 200) : '',
+            until: r.until || null
+          });
+        }
+      });
+      out[uid] = [...map.values()].sort((a, b) => (b.at || 0) - (a.at || 0));
+    });
+    return out;
+  }
+  function listRestrictions(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return [];
+    const list = ensureRestrictions()[id];
+    return Array.isArray(list) ? list.slice().sort((a, b) => (b.at || 0) - (a.at || 0)) : [];
+  }
+  function applyRestriction(userId, action, reason, until) {
+    if (!myIsMod() || !modToolsOn()) {
+      /* L3+ agreeReport may call with elevated path — allow if canOpenReportQueue and reason from queue */
+      if (!(canOpenReportQueue() && reason === '__queue__')) {
+        try { ui.toast(myIsMod() ? 'Turn Mod tools on' : 'Mods only'); } catch (e) {}
+        return false;
+      }
+    }
+    const id = String(userId || '').trim();
+    const act = String(action || '').trim().toLowerCase();
+    if (!id || !RESTRICT_ACTIONS[act]) return false;
+    if (id === localUserId()) {
+      try { ui.toast("Can't restrict yourself"); } catch (e) {}
+      return false;
+    }
+    let untilMs = until || null;
+    if (act === 'tempban' && !untilMs) untilMs = Date.now() + MS_24H;
+    let why = reason;
+    if (why === '__queue__') why = '';
+    if (why == null) {
+      try { why = window.prompt((RESTRICT_ACTIONS[act] || act) + ' reason (optional)', '') || ''; } catch (e) { why = ''; }
+    }
+    const entry = {
+      action: act,
+      by: localUserId() || '',
+      at: Date.now(),
+      reason: String(why || '').trim().slice(0, 200),
+      until: untilMs
+    };
+    const bag = ensureRestrictions();
+    const list = Array.isArray(bag[id]) ? bag[id].slice() : [];
+    list.push(entry);
+    bag[id] = list;
+    persist();
+    try { syncRestrictionHistoryUi(); } catch (e) {}
+    try { ui.toast(RESTRICT_ACTIONS[act] + ' recorded'); } catch (e) {}
+    return true;
+  }
+
+  function ensureReportQueue() {
+    if (!Array.isArray(state.reportQueue)) state.reportQueue = [];
+    return state.reportQueue;
+  }
+  function mergeReportQueue(localArr, remoteArr) {
+    const map = new Map();
+    (localArr || []).concat(remoteArr || []).forEach((r) => {
+      if (!r || !r.id) return;
+      const cur = map.get(r.id);
+      if (!cur || (r.at || 0) >= (cur.at || 0) || (r.resolvedAt || 0) >= (cur.resolvedAt || 0)) {
+        map.set(r.id, r);
+      }
+    });
+    return [...map.values()].sort((a, b) => (a.at || 0) - (b.at || 0));
+  }
+  function canOpenReportQueue(userId) {
+    const id = userId == null || userId === '' ? localUserId() : String(userId);
+    if (!id) return false;
+    if (isFounder(id) || isMod(id)) return true;
+    return accountLevel(id) >= 3;
+  }
+  function featureDisplayTitle(f) {
+    if (!f || typeof f !== 'object') return 'Object';
+    if (f.name) return String(f.name).trim().slice(0, 48);
+    if (f.role) return (ROLE_LABEL[f.role] || f.role);
+    if (f.kind) {
+      if (f.kind === 'cleanup') return 'Cleanup';
+      if (f.kind === 'water-heavy') return 'Heavy water';
+      if (f.kind === 'water-light') return 'Light water';
+      if (String(f.kind).indexOf('move-') === 0) return 'Move ' + (ROLE_LABEL[f.kind.slice(5)] || f.kind.slice(5));
+      return String(f.kind);
+    }
+    if (f.cutFt != null) return 'Dig pad · ' + f.cutFt + ' ft';
+    if (Array.isArray(f.pts)) return 'Haul path';
+    if (f.w != null && f.l != null) return 'Surface';
+    return 'Object';
+  }
+  function enqueueReport(featureId, reporterId) {
+    const fid = String(featureId || '').trim();
+    const by = String(reporterId || localUserId() || '').trim();
+    if (!fid || !by) return null;
+    const q = ensureReportQueue();
+    /* Idempotent pending row per feature+reporter */
+    const existing = q.find((r) => r && r.featureId === fid && r.by === by && r.status === 'pending');
+    if (existing) return existing;
+    const feat = findFeatureById(fid);
+    const ownerId = feat ? String(feat.userId || feat.by || '') : '';
+    const row = {
+      id: 'rpt-' + uid(),
+      featureId: fid,
+      ownerId: ownerId,
+      title: featureDisplayTitle(feat),
+      by: by,
+      at: Date.now(),
+      status: 'pending',
+      resolvedBy: '',
+      resolvedAt: 0,
+      restriction: ''
+    };
+    q.push(row);
+    return row;
+  }
+  function listPendingReports() {
+    return ensureReportQueue().filter((r) => r && r.status === 'pending').slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+  }
+  function nextPendingReport() {
+    if (!canOpenReportQueue()) return null;
+    const pending = listPendingReports();
+    return pending.length ? pending[0] : null;
+  }
+  function findReport(reportId) {
+    const id = String(reportId || '').trim();
+    return ensureReportQueue().find((r) => r && r.id === id) || null;
+  }
+  function dismissReport(reportId) {
+    if (!canOpenReportQueue()) {
+      try { ui.toast('L3+ only'); } catch (e) {}
+      return false;
+    }
+    const row = findReport(reportId);
+    if (!row || row.status !== 'pending') return false;
+    row.status = 'dismissed';
+    row.resolvedBy = localUserId() || '';
+    row.resolvedAt = Date.now();
+    persist();
+    try { ui.toast('Report dismissed'); } catch (e) {}
+    return true;
+  }
+  function agreeReport(reportId, action, reason) {
+    if (!canOpenReportQueue()) {
+      try { ui.toast('L3+ only'); } catch (e) {}
+      return false;
+    }
+    const row = findReport(reportId);
+    if (!row || row.status !== 'pending') return false;
+    const act = String(action || '').trim().toLowerCase();
+    if (!RESTRICT_ACTIONS[act]) {
+      try { ui.toast('Pick a punishment'); } catch (e) {}
+      return false;
+    }
+    let why = reason;
+    if (why == null) {
+      try { why = window.prompt((RESTRICT_ACTIONS[act] || act) + ' reason (optional)', '') || ''; } catch (e) { why = ''; }
+    }
+    const owner = row.ownerId || '';
+    if (owner) {
+      /* Write public restriction without requiring Mod tools (L3 queue path). */
+      const bag = ensureRestrictions();
+      const list = Array.isArray(bag[owner]) ? bag[owner].slice() : [];
+      let untilMs = null;
+      if (act === 'tempban') untilMs = Date.now() + MS_24H;
+      list.push({
+        action: act,
+        by: localUserId() || '',
+        at: Date.now(),
+        reason: String(why || '').trim().slice(0, 200) || ('queue:' + row.id),
+        until: untilMs
+      });
+      bag[owner] = list;
+    }
+    row.status = 'resolved';
+    row.resolvedBy = localUserId() || '';
+    row.resolvedAt = Date.now();
+    row.restriction = act;
+    persist();
+    try { syncRestrictionHistoryUi(); } catch (e) {}
+    try { ui.toast('Violation · ' + RESTRICT_ACTIONS[act]); } catch (e) {}
+    return true;
+  }
+
+  function collectOwnerRated(userId) {
+    const id = String(userId || '').trim();
+    const out = [];
+    if (!id) return out;
+    featureBags().forEach((arr) => {
+      (arr || []).forEach((f) => {
+        if (!f || f.gone) return;
+        const owner = f.userId || f.by;
+        if (owner !== id) return;
+        const likes = (f.likes || []).length;
+        const dislikes = (f.dislikes || []).length;
+        if (!likes && !dislikes) return;
+        let at = 0;
+        (f.likes || []).forEach((L) => { if (L && (L.at || 0) > at) at = L.at || 0; });
+        (f.dislikes || []).forEach((D) => { if (D && (D.at || 0) > at) at = D.at || 0; });
+        out.push({
+          featureId: f.id || '',
+          title: featureDisplayTitle(f),
+          likes: likes,
+          dislikes: dislikes,
+          at: at || f.u || 0
+        });
+      });
+    });
+    out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    return out;
+  }
+  function refreshRatedHistory(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return [];
+    const rated = collectOwnerRated(id).slice(0, 12);
+    const profiles = ensureProfiles();
+    const cur = profiles[id] || { userId: id, name: '', role: '', u: 0 };
+    cur.ratedHistory = rated;
+    cur.u = Math.max(cur.u || 0, now());
+    profiles[id] = cur;
+    try {
+      localStorage.setItem('onpad:likesReceived:' + id, String(accountLikesReceived(id)));
+      localStorage.setItem('onpad:dislikesReceived:' + id, String(accountDislikesReceived(id)));
+    } catch (e) {}
+    return rated;
+  }
+  function accountRecentRated(userId) {
+    const id = String(userId || '').trim();
+    const live = collectOwnerRated(id);
+    if (live.length) return live.slice(0, 8);
+    const reg = state.profiles && state.profiles[id];
+    if (reg && Array.isArray(reg.ratedHistory)) return reg.ratedHistory.slice(0, 8);
+    return [];
+  }
+  function accountScoreTrend24h(userId) {
+    const id = String(userId || '').trim();
+    const since = Date.now() - MS_24H;
+    let likes = 0;
+    let dislikes = 0;
+    if (!id) return { likes: 0, dislikes: 0 };
+    featureBags().forEach((arr) => {
+      (arr || []).forEach((f) => {
+        if (!f) return;
+        const owner = f.userId || f.by;
+        if (owner !== id) return;
+        (f.likes || []).forEach((L) => { if (L && (L.at || 0) >= since) likes += 1; });
+        (f.dislikes || []).forEach((D) => { if (D && (D.at || 0) >= since) dislikes += 1; });
+      });
+    });
+    (state.likes || []).forEach((L) => {
+      if (!L || L.targetUserId !== id) return;
+      if ((L.at || 0) >= since) likes += 1;
+    });
+    return { likes: likes, dislikes: dislikes };
+  }
+  function accountScoreNet(userId) {
+    return accountLikesReceived(userId) - accountDislikesReceived(userId);
+  }
+  function accountScoreFormat(userId) {
+    return '▲ ' + accountLikesReceived(userId) + '  ▼ ' + accountDislikesReceived(userId);
+  }
+  function accountGetScore(userId) {
+    const likes = accountLikesReceived(userId);
+    const dislikes = accountDislikesReceived(userId);
+    const net = likes - dislikes;
+    return { likes: likes, dislikes: dislikes, net: net, label: '▲ ' + likes + '  ▼ ' + dislikes };
+  }
+  function formatNet(n) {
+    const v = Number(n) || 0;
+    return (v > 0 ? '+' : '') + String(v);
+  }
+  function syncProfileScoreHeader() {
+    const id = viewingUserId || localUserId();
+    const score = accountGetScore(id);
+    const trend = accountScoreTrend24h(id);
+    const netEl = document.getElementById('profileScoreNet');
+    const countsEl = document.getElementById('profileScoreCounts');
+    const trendEl = document.getElementById('profileScoreTrend');
+    const list = document.getElementById('profileRatedList');
+    const hoursEl = document.getElementById('profileHoursStub');
+    const machinesEl = document.getElementById('profileMachinesStub');
+    if (netEl) {
+      netEl.textContent = formatNet(score.net);
+      netEl.classList.toggle('is-neg', score.net < 0);
+      netEl.classList.toggle('is-pos', score.net > 0);
+    }
+    if (countsEl) countsEl.textContent = score.label;
+    if (trendEl) {
+      trendEl.textContent = '24h · ▲ ' + trend.likes + '  ▼ ' + trend.dislikes +
+        '   ·   all-time · ▲ ' + score.likes + '  ▼ ' + score.dislikes;
+    }
+    if (list) {
+      list.textContent = '';
+      const rated = accountRecentRated(id);
+      if (!rated.length) {
+        const li = document.createElement('li');
+        li.className = 'profile-rated-empty';
+        li.textContent = 'No rated objects yet';
+        list.appendChild(li);
+      } else {
+        rated.forEach((r) => {
+          const li = document.createElement('li');
+          li.className = 'profile-rated-item';
+          li.textContent = (r.title || 'Object') + ' · +' + (r.likes || 0) + ' / −' + (r.dislikes || 0);
+          list.appendChild(li);
+        });
+      }
+    }
+    if (hoursEl) hoursEl.textContent = 'Hours · —';
+    if (machinesEl) {
+      let n = 0;
+      (state.fleet || []).forEach((f) => {
+        if (!f || f.gone) return;
+        if ((f.userId || f.by) === id) n += 1;
+      });
+      Object.keys(state.machines || {}).forEach((k) => {
+        const m = state.machines[k];
+        if (!m) return;
+        const owner = m.userId || m.by || (isKnownRole(k) ? '' : k);
+        if (owner === id) n += 1;
+      });
+      machinesEl.textContent = 'Machines · ' + (n ? String(n) : '—');
+    }
+  }
+  function syncRestrictionHistoryUi() {
+    const section = document.getElementById('restrictionHistorySection');
+    const list = document.getElementById('restrictionHistoryList');
+    if (!section || !list) return;
+    const id = viewingUserId || localUserId();
+    const rows = listRestrictions(id);
+    list.textContent = '';
+    if (!rows.length) { section.hidden = true; return; }
+    section.hidden = false;
+    rows.forEach((r) => {
+      const li = document.createElement('li');
+      li.className = 'restriction-history-item';
+      const label = RESTRICT_ACTIONS[r.action] || r.action;
+      const when = r.at ? new Date(r.at).toLocaleString() : '';
+      const until = r.until ? (' · until ' + new Date(r.until).toLocaleString()) : '';
+      const reason = r.reason ? (' · ' + r.reason) : '';
+      li.textContent = label + ' · ' + truncUserId(r.by || '') + (when ? (' · ' + when) : '') + until + reason;
+      list.appendChild(li);
+    });
+  }
+
+    /* Unique like events on target's stamps: unique by+featureId (feature.likes + registry). */
   function accountLikesReceived(userId) {
     if (!userId) return 0;
     const keys = new Set();
@@ -1840,7 +2279,10 @@
     const by = localUserId();
     if (!by || !featureId) return false;
     const likes = ensureLikesRegistry();
-    if (likes.some((L) => L && L.featureId === featureId && L.by === by)) return true;
+    if (likes.some((L) => L && L.featureId === featureId && L.by === by)) {
+      if (targetUserId) refreshRatedHistory(targetUserId);
+      return true;
+    }
     const feat = findFeatureById(featureId);
     const target = targetUserId || (feat ? (feat.userId || feat.by || '') : '') || '';
     const at = Date.now();
@@ -1850,27 +2292,56 @@
       if (!feat.likes.some((L) => L && L.by === by)) feat.likes.push({ by, at });
       feat.u = Math.max(feat.u || 0, at);
     }
-    /* Keep Builder stub counters in sync for older clients */
     try {
       if (target) {
-        const k = 'onpad:likesReceived:' + target;
-        localStorage.setItem(k, String(accountLikesReceived(target)));
+        localStorage.setItem('onpad:likesReceived:' + target, String(accountLikesReceived(target)));
+        localStorage.setItem('onpad:dislikesReceived:' + target, String(accountDislikesReceived(target)));
       }
       localStorage.setItem('onpad:likeSeen:' + featureId + ':' + by, '1');
     } catch (e) {}
+    if (target) refreshRatedHistory(target);
     persist();
     try { updateSocialCreditUi(); } catch (e) {}
+    try { syncProfileScoreHeader(); } catch (e) {}
+    return true;
+  }
+  function accountRecordDislike(featureId, targetUserId) {
+    const by = localUserId();
+    if (!by || !featureId) return false;
+    const feat = findFeatureById(featureId);
+    const target = targetUserId || (feat ? (feat.userId || feat.by || '') : '') || '';
+    const at = Date.now();
+    if (feat) {
+      ensureReactionArrays(feat);
+      if (!feat.dislikes.some((D) => D && D.by === by)) {
+        feat.dislikes.push({ by, at });
+        feat.u = Math.max(feat.u || 0, at);
+      }
+    }
+    try {
+      if (target) {
+        localStorage.setItem('onpad:likesReceived:' + target, String(accountLikesReceived(target)));
+        localStorage.setItem('onpad:dislikesReceived:' + target, String(accountDislikesReceived(target)));
+      }
+      localStorage.setItem('onpad:dislikeSeen:' + featureId + ':' + by, '1');
+    } catch (e) {}
+    if (target) refreshRatedHistory(target);
+    persist();
+    try { updateSocialCreditUi(); } catch (e) {}
+    try { syncProfileScoreHeader(); } catch (e) {}
     return true;
   }
   function updateSocialCreditUi() {
     const el = document.getElementById('socialCreditLevel');
-    if (!el) return;
-    const id = localUserId();
-    const n = accountLikesReceived(id);
-    const d = accountDislikesReceived(id);
-    const lv = accountLevel(id);
-    el.textContent = 'Level L' + lv + ' · ' + n + ' likes · ' + d + ' dislikes';
-    el.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
+    if (el) {
+      const id = localUserId();
+      const n = accountLikesReceived(id);
+      const d = accountDislikesReceived(id);
+      const lv = accountLevel(id);
+      el.textContent = 'Level L' + lv + ' · ' + n + ' likes · ' + d + ' dislikes';
+      el.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
+    }
+    try { syncProfileScoreHeader(); } catch (e) {}
   }
 
   /* Global API for App Builder (map tap-chip + soft-lock + social credit). Settings owns progress UI. */
@@ -1884,19 +2355,36 @@
     signOut: () => signOutGoogle(),
     likesReceived: (userId) => accountLikesReceived(userId),
     dislikesReceived: (userId) => accountDislikesReceived(userId),
+    scoreFormat: (userId) => accountScoreFormat(userId),
+    formatScore: (userId) => accountScoreFormat(userId),
+    scoreNet: (userId) => accountScoreNet(userId),
+    getScore: (userId) => accountGetScore(userId),
+    recentRated: (userId) => accountRecentRated(userId),
+    refreshRatedHistory: (userId) => refreshRatedHistory(userId),
     level: (userId) => accountLevel(userId),
     myLevel: () => accountLevel(localUserId()),
     getLevel: () => accountLevel(localUserId()),
     recordLike: (featureId, targetUserId) => accountRecordLike(featureId, targetUserId),
+    recordDislike: (featureId, targetUserId) => accountRecordDislike(featureId, targetUserId),
     canAutoDecideReport: () => !!myIsMod(),
+    canOpenReportQueue: (userId) => canOpenReportQueue(userId),
+    enqueueReport: (featureId, reporterId) => enqueueReport(featureId, reporterId),
+    listPendingReports: () => listPendingReports(),
+    nextPendingReport: () => nextPendingReport(),
+    dismissReport: (reportId) => dismissReport(reportId),
+    agreeReport: (reportId, action, reason) => agreeReport(reportId, action, reason),
     isBoardVoter: (userId) => googleSignedIn() || !!(userId && String(userId)),
     isFounder: (userId) => isFounder(userId),
     isMod: (userId) => isMod(userId),
     myIsMod: () => myIsMod(),
+    modToolsOn: () => modToolsOn(),
+    setModToolsOn: (on) => setModToolsOn(!!on),
     addMod: (userIdOrEmail) => addMod(userIdOrEmail),
     removeMod: (userIdOrEmail) => removeMod(userIdOrEmail),
     listMods: () => listMods(),
     grantLikes: (featureId, targetUserId, n) => grantLikes(featureId, targetUserId, n),
+    applyRestriction: (userId, action, reason, until) => applyRestriction(userId, action, reason, until),
+    listRestrictions: (userId) => listRestrictions(userId),
     openProfile: (userIdOrHint) => openProfile(userIdOrHint),
     setNearbyUsers: (rows) => setNearbyUsers(rows),
     get STAMP_LOCK_MS() { return STAMP_LOCK_MS; },
@@ -1959,6 +2447,8 @@
       paths: [],
       likes: [],
       mods: [],
+      restrictions: {},
+      reportQueue: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
       profiles: {},
@@ -1990,6 +2480,8 @@
           if (!Array.isArray(s.paths)) s.paths = [];
           if (!Array.isArray(s.likes)) s.likes = [];
           if (!Array.isArray(s.mods)) s.mods = [];
+          if (!s.restrictions || typeof s.restrictions !== 'object') s.restrictions = {};
+          if (!Array.isArray(s.reportQueue)) s.reportQueue = [];
           if (!s.profiles || typeof s.profiles !== 'object') s.profiles = {};
           return s;
         }
@@ -2009,6 +2501,8 @@
       paths: state.paths || [],
       likes: state.likes || [],
       mods: state.mods || [],
+      restrictions: state.restrictions || {},
+      reportQueue: state.reportQueue || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
       profiles: state.profiles || {},
@@ -2051,6 +2545,8 @@
     state.paths = mergeById(state.paths || [], remote.paths || []);
     state.likes = mergeById(state.likes || [], remote.likes || []);
     state.mods = mergeMods(state.mods || [], remote.mods || []);
+    state.restrictions = mergeRestrictions(state.restrictions || {}, remote.restrictions || {});
+    state.reportQueue = mergeReportQueue(state.reportQueue || [], remote.reportQueue || []);
     state.profiles = mergeProfiles(state.profiles || {}, remote.profiles || {});
     rebindPathDraft();
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
@@ -2280,6 +2776,8 @@
     ensureDisplayNameSeeded();
     updateSocialCreditUi();
     syncViewedProfileUi();
+    syncProfileScoreHeader();
+    syncModToolsUi();
   }
   function applyRole(next) {
     if (!isKnownRole(next)) return;
@@ -3454,7 +3952,7 @@
 
   function removeItem(arr, item) {
     /* Ownership: owner or mod (myIsMod). Moderation paths call forceRemove. */
-    if (!item._forceRemove && !isOwnStamp(item) && !myIsMod()) {
+    if (!item._forceRemove && !isOwnStamp(item) && !(myIsMod() && modToolsOn())) {
       ui.toast("Can't delete — not yours");
       return;
     }
@@ -3774,10 +4272,29 @@
     const grantInput = document.getElementById('viewedGrantLikesN');
     if (grantBtn) {
       grantBtn.addEventListener('click', () => {
-        if (!viewingUserId || !myIsMod()) return;
+        if (!viewingUserId || !myIsMod() || !modToolsOn()) return;
         const n = grantInput ? grantInput.value : 1;
         const fid = 'mod-grant-' + viewingUserId + '-' + Date.now();
         if (grantLikes(fid, viewingUserId, n)) ui.toast('Granted likes');
+      });
+    }
+    const modToolsToggle = document.getElementById('modToolsToggle');
+    if (modToolsToggle && !modToolsToggle._wired) {
+      modToolsToggle._wired = true;
+      modToolsToggle.addEventListener('click', () => {
+        if (!myIsMod()) { ui.toast('Mods only'); return; }
+        setModToolsOn(!modToolsOn());
+        ui.toast(modToolsOn() ? 'Mod tools on' : 'Mod tools off');
+      });
+    }
+    const modActionGrid = document.getElementById('viewedModActionGrid');
+    if (modActionGrid && !modActionGrid._wired) {
+      modActionGrid._wired = true;
+      modActionGrid.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-restrict]') : null;
+        if (!btn) return;
+        if (!viewingUserId) return;
+        applyRestriction(viewingUserId, btn.getAttribute('data-restrict'));
       });
     }
     function promptGoogleSignIn() {
@@ -3828,6 +4345,8 @@
     if (!Array.isArray(state.paths)) state.paths = [];
     if (!Array.isArray(state.likes)) state.likes = [];
     if (!Array.isArray(state.mods)) state.mods = [];
+    if (!state.restrictions || typeof state.restrictions !== 'object') state.restrictions = {};
+    if (!Array.isArray(state.reportQueue)) state.reportQueue = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     machineMarkers = {};
     accCircle = null;
@@ -3851,6 +4370,8 @@
     if (!Array.isArray(state.paths)) state.paths = [];
     if (!Array.isArray(state.likes)) state.likes = [];
     if (!Array.isArray(state.mods)) state.mods = [];
+    if (!state.restrictions || typeof state.restrictions !== 'object') state.restrictions = {};
+    if (!Array.isArray(state.reportQueue)) state.reportQueue = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     if (snap) applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
     /* strip legacy job codes / snapshots from the URL so drivers see a clean link */
@@ -3882,8 +4403,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v38').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=38')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v39').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=39')).catch(() => {});
   }
 
   function showBootError(msg) {
