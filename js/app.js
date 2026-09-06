@@ -200,6 +200,13 @@
       else localStorage.removeItem('onpad:googleName');
       if (payload.email) localStorage.setItem('onpad:googleEmail', String(payload.email).slice(0, 120));
       else localStorage.removeItem('onpad:googleEmail');
+      /* Founder: persist sub when confirmed founder Google email signs in (case-insensitive). */
+      try {
+        const em = String(payload.email || '').trim().toLowerCase();
+        if (em === FOUNDER_EMAIL && payload.sub) {
+          localStorage.setItem('onpad:founderSub', String(payload.sub));
+        }
+      } catch (e) {}
       if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
       else localStorage.removeItem('onpad:googlePicture');
       if (!displayName() && payload.name) setDisplayName(payload.name);
@@ -594,18 +601,7 @@
     note.textContent = 'Locked';
     return note;
   }
-  function myIsMod() {
-    /* Prefer Profile roster (?v=30+). Never invent founder locally. */
-    try {
-      if (window.OnPadAccount && typeof window.OnPadAccount.myIsMod === 'function') {
-        return !!window.OnPadAccount.myIsMod();
-      }
-      if (window.OnPadAccount && typeof window.OnPadAccount.isMod === 'function') {
-        return !!window.OnPadAccount.isMod(currentUserId());
-      }
-    } catch (e) {}
-    return false;
-  }
+  /* myIsMod / isMod / founder roster: defined with OnPadAccount founder/mods API below. */
 
   function appendKillOrLock(acts, item, onKill) {
     /* Own stamps, or mods (myIsMod) may delete any item. */
@@ -1086,6 +1082,368 @@
     }
   };
 
+  /* ---- Founder / mods roster (Profile owns; Builder map mod UX is separate). ---- */
+  const FOUNDER_EMAIL = 'johnsonswork@gmail.com';
+  const GRANT_LIKES_MAX = 10000;
+
+  function founderSubStored() {
+    try { return localStorage.getItem('onpad:founderSub') || ''; } catch (e) { return ''; }
+  }
+  function ensureMods() {
+    if (!Array.isArray(state.mods)) state.mods = [];
+    return state.mods;
+  }
+  function normalizeEmail(em) {
+    return String(em || '').trim().toLowerCase();
+  }
+  function isFounderEmail(em) {
+    return normalizeEmail(em) === FOUNDER_EMAIL;
+  }
+  function isFounder(userId) {
+    const id = userId == null || userId === '' ? localUserId() : String(userId);
+    const stored = founderSubStored();
+    if (stored && id === stored) return true;
+    /* Self / current Google session: match confirmed founder email (case-insensitive). */
+    const me = localUserId();
+    if (id === me || id === googleSub()) {
+      const em = googleEmail();
+      if (isFounderEmail(em)) {
+        const sub = googleSub();
+        if (sub) {
+          try { localStorage.setItem('onpad:founderSub', String(sub)); } catch (e) {}
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+  function modKey(m) {
+    if (!m || typeof m !== 'object') return null;
+    if (m.userId) return 'id:' + String(m.userId);
+    if (m.email) return 'em:' + normalizeEmail(m.email);
+    return null;
+  }
+  function mergeMods(localArr, remoteArr) {
+    const map = new Map();
+    function put(m) {
+      if (!m || typeof m !== 'object') return;
+      const k = modKey(m);
+      if (!k) return;
+      const cur = map.get(k);
+      if (!cur || (m.u || 0) >= (cur.u || 0)) {
+        map.set(k, {
+          userId: m.userId ? String(m.userId) : undefined,
+          email: m.email ? normalizeEmail(m.email) : undefined,
+          u: m.u || 0
+        });
+      }
+    }
+    (localArr || []).forEach(put);
+    (remoteArr || []).forEach(put);
+    return [...map.values()];
+  }
+  function listMods() {
+    return (ensureMods() || []).map((m) => ({
+      userId: m.userId || undefined,
+      email: m.email || undefined,
+      u: m.u || 0
+    }));
+  }
+  function modMatchesUser(m, userId) {
+    if (!m || !userId) return false;
+    if (m.userId && String(m.userId) === String(userId)) return true;
+    if (m.email && String(userId) === localUserId()) {
+      const em = normalizeEmail(googleEmail());
+      if (em && em === normalizeEmail(m.email)) return true;
+    }
+    return false;
+  }
+  function isMod(userId) {
+    const id = userId == null || userId === '' ? localUserId() : String(userId);
+    if (!id) return false;
+    if (isFounder(id)) return true;
+    return (state.mods || []).some((m) => modMatchesUser(m, id));
+  }
+  function myIsMod() {
+    return isMod(localUserId());
+  }
+  function parseModIdentity(userIdOrEmail) {
+    const s = String(userIdOrEmail || '').trim();
+    if (!s) return null;
+    if (s.indexOf('@') >= 0) return { email: normalizeEmail(s) };
+    return { userId: s };
+  }
+  function addMod(userIdOrEmail) {
+    if (!isFounder()) {
+      try { ui.toast('Founder only'); } catch (e) {}
+      return false;
+    }
+    const ident = parseModIdentity(userIdOrEmail);
+    if (!ident) return false;
+    const mods = ensureMods();
+    const entry = {
+      userId: ident.userId || undefined,
+      email: ident.email || undefined,
+      u: now()
+    };
+    const k = modKey(entry);
+    const next = mods.filter((m) => modKey(m) !== k);
+    next.push(entry);
+    state.mods = next;
+    persist();
+    try { syncModsUi(); } catch (e) {}
+    try { ui.toast('Mod added'); } catch (e) {}
+    return true;
+  }
+  function removeMod(userIdOrEmail) {
+    if (!isFounder()) {
+      try { ui.toast('Founder only'); } catch (e) {}
+      return false;
+    }
+    const ident = parseModIdentity(userIdOrEmail);
+    if (!ident) return false;
+    const probe = { userId: ident.userId, email: ident.email, u: 0 };
+    const k = modKey(probe);
+    const mods = ensureMods();
+    const before = mods.length;
+    state.mods = mods.filter((m) => modKey(m) !== k);
+    if (state.mods.length === before) return false;
+    persist();
+    try { syncModsUi(); } catch (e) {}
+    try { ui.toast('Mod removed'); } catch (e) {}
+    return true;
+  }
+  /* Nearby users fed by Builder map bounds (all signed-in may see list). */
+  let nearbyUsers = [];
+  let viewingUserId = null; /* null = own editable profile */
+
+  function setNearbyUsers(rows) {
+    nearbyUsers = [];
+    (Array.isArray(rows) ? rows : []).forEach((r) => {
+      if (!r || typeof r !== 'object') return;
+      const userId = String(r.userId || '').trim();
+      if (!userId) return;
+      nearbyUsers.push({
+        userId: userId,
+        name: String(r.name || '').slice(0, 80),
+        role: String(r.role || '').slice(0, 40),
+        lat: typeof r.lat === 'number' ? r.lat : null,
+        lng: typeof r.lng === 'number' ? r.lng : null
+      });
+    });
+    try { syncNearbyUsersUi(); } catch (e) {}
+    return nearbyUsers.slice();
+  }
+
+  /* Mods-only: grant n likes for featureId→target. Idempotent per featureId+target (no double-count). */
+  function grantLikes(featureId, targetUserId, n) {
+    if (!myIsMod()) {
+      try { ui.toast('Mods only'); } catch (e) {}
+      return false;
+    }
+    const fid = String(featureId || '').trim();
+    const target = String(targetUserId || '').trim();
+    if (!fid || !target) return false;
+    let count = Math.floor(Number(n));
+    if (!isFinite(count)) return false;
+    count = Math.max(1, Math.min(GRANT_LIKES_MAX, count));
+    const likes = ensureLikesRegistry();
+    /* Idempotent: same featureId+target already granted → no double-count */
+    if (likes.some((L) => L && L.grant && L.targetUserId === target && (L.grantRoot === fid || L.featureId === fid))) {
+      try {
+        localStorage.setItem('onpad:likesReceived:' + target, String(accountLikesReceived(target)));
+      } catch (e) {}
+      return true;
+    }
+    const by = localUserId() || 'mod-grant';
+    const at = Date.now();
+    for (let i = 0; i < count; i++) {
+      /* Unique featureId keys so accountLikesReceived counts n; grantRoot pins idempotency. */
+      const grantFid = fid + '#' + i;
+      likes.push({
+        id: 'like-' + uid(),
+        featureId: grantFid,
+        grantRoot: fid,
+        targetUserId: target,
+        by: by,
+        at: at,
+        grant: true
+      });
+    }
+    const feat = findFeatureById(fid);
+    if (feat) {
+      ensureReactionArrays(feat);
+      if (!feat.likes.some((L) => L && L.by === by && L.grant)) {
+        feat.likes.push({ by: by, at: at, grant: true });
+        feat.u = Math.max(feat.u || 0, at);
+      }
+    }
+    try {
+      localStorage.setItem('onpad:likesReceived:' + target, String(accountLikesReceived(target)));
+    } catch (e) {}
+    persist();
+    try { updateSocialCreditUi(); } catch (e) {}
+    try { syncViewedProfileUi(); } catch (e) {}
+    return true;
+  }
+
+  function canOpenProfile(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return false;
+    if (id === localUserId()) return true;
+    return googleSignedIn();
+  }
+
+  function openProfile(userId) {
+    const id = String(userId || '').trim() || localUserId();
+    if (!id) return false;
+    if (!canOpenProfile(id)) return false;
+    /* Missing unknown remote with no profile/nearby/self hint still opens (read-only stub). */
+    viewingUserId = (id === localUserId()) ? null : id;
+    try {
+      openSheet('roleSheet');
+      syncProfileSheet();
+      syncViewedProfileUi();
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
+  function syncRoleBadgeUi() {
+    const badge = document.getElementById('profileRoleBadge');
+    if (!badge) return;
+    const viewId = viewingUserId || localUserId();
+    if (isFounder(viewId)) {
+      badge.hidden = false;
+      badge.textContent = 'Founder';
+      badge.className = 'profile-role-badge is-founder';
+      badge.setAttribute('title', 'OnPad founder');
+    } else if (isMod(viewId)) {
+      badge.hidden = false;
+      badge.textContent = 'Mod';
+      badge.className = 'profile-role-badge is-mod';
+      badge.setAttribute('title', 'OnPad moderator');
+    } else {
+      badge.hidden = true;
+      badge.textContent = '';
+    }
+  }
+
+  function syncViewedProfileUi() {
+    const viewingOther = !!(viewingUserId && viewingUserId !== localUserId());
+    const editBlocks = document.querySelectorAll('[data-own-profile-only]');
+    editBlocks.forEach((el) => { el.hidden = viewingOther; });
+    const viewCard = document.getElementById('viewedProfileCard');
+    if (viewCard) {
+      viewCard.hidden = !viewingOther;
+      if (viewingOther) {
+        const p = lookupProfile(viewingUserId) || {};
+        const near = nearbyUsers.find((u) => u.userId === viewingUserId);
+        const name = (p && p.name) || (near && near.name) || profileLabel(viewingUserId) || truncUserId(viewingUserId);
+        const roleTxt = (p && p.role) || (near && near.role) || '';
+        const likes = accountLikesReceived(viewingUserId);
+        const lv = accountLevel(viewingUserId);
+        const nameEl = document.getElementById('viewedProfileName');
+        const roleEl = document.getElementById('viewedProfileRole');
+        const levelEl = document.getElementById('viewedProfileLevel');
+        const idEl = document.getElementById('viewedProfileId');
+        if (nameEl) nameEl.textContent = name;
+        if (roleEl) roleEl.textContent = roleTxt ? ('Role · ' + roleTxt) : 'Role · —';
+        if (levelEl) {
+          levelEl.textContent = 'Level L' + lv + ' · ' + likes + ' likes';
+          levelEl.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
+        }
+        if (idEl) {
+          idEl.textContent = truncUserId(viewingUserId);
+          idEl.setAttribute('title', viewingUserId);
+        }
+        const back = document.getElementById('viewedProfileBack');
+        if (back && !back._wired) {
+          back._wired = true;
+          back.addEventListener('click', () => {
+            viewingUserId = null;
+            syncProfileSheet();
+            syncViewedProfileUi();
+          });
+        }
+        /* Mod grant likes controls — mod-only */
+        const grantWrap = document.getElementById('viewedGrantLikes');
+        if (grantWrap) {
+          grantWrap.hidden = !myIsMod();
+        }
+      }
+    }
+    syncRoleBadgeUi();
+    syncModsUi();
+    syncNearbyUsersUi();
+  }
+
+  function syncNearbyUsersUi() {
+    const section = document.getElementById('nearbyUsersSection');
+    if (!section) return;
+    const show = googleSignedIn() && nearbyUsers.length > 0;
+    section.hidden = !show;
+    const list = document.getElementById('nearbyUsersList');
+    if (!list) return;
+    list.textContent = '';
+    if (!show) return;
+    nearbyUsers.forEach((u) => {
+      const li = document.createElement('li');
+      li.className = 'nearby-user-item';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fat nearby-user-btn';
+      const label = (u.name || truncUserId(u.userId)) + (u.role ? (' · ' + u.role) : '');
+      btn.textContent = label;
+      btn.setAttribute('title', u.userId);
+      btn.addEventListener('click', () => { openProfile(u.userId); });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+
+  function syncModsUi() {
+    syncRoleBadgeUi();
+    const section = document.getElementById('modsSection');
+    if (!section) return;
+    /* Founder-only management on own profile */
+    const founderOwn = isFounder() && !viewingUserId;
+    section.hidden = !founderOwn;
+    if (!founderOwn) return;
+    const list = document.getElementById('modsList');
+    if (list) {
+      list.textContent = '';
+      const mods = listMods();
+      if (!mods.length) {
+        const empty = document.createElement('li');
+        empty.className = 'mods-empty';
+        empty.textContent = 'No mods yet';
+        list.appendChild(empty);
+      } else {
+        mods.forEach((m) => {
+          const li = document.createElement('li');
+          li.className = 'mods-item';
+          const label = document.createElement('span');
+          label.className = 'mods-label';
+          label.textContent = m.userId || m.email || '?';
+          label.setAttribute('title', m.userId || m.email || '');
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.className = 'fat mods-remove';
+          rm.textContent = 'Remove';
+          rm.setAttribute('data-mod', m.userId || m.email || '');
+          rm.addEventListener('click', () => {
+            removeMod(m.userId || m.email);
+          });
+          li.appendChild(label);
+          li.appendChild(rm);
+          list.appendChild(li);
+        });
+      }
+    }
+  }
+
   /* ---- Social credit (Profile owns ladder; Builder owns map like/report UI). ----
      Feature reaction shape (Builder-locked):
        likes: [{ by, at }], dislikes: [{ by, at }], reports: [{ by, at }],
@@ -1197,6 +1555,15 @@
     recordLike: (featureId, targetUserId) => accountRecordLike(featureId, targetUserId),
     canAutoDeleteReport: (reporterId) => accountLevel(reporterId || localUserId()) >= 3,
     isBoardVoter: (userId) => googleSignedIn() || !!(userId && String(userId)),
+    isFounder: (userId) => isFounder(userId),
+    isMod: (userId) => isMod(userId),
+    myIsMod: () => myIsMod(),
+    addMod: (userIdOrEmail) => addMod(userIdOrEmail),
+    removeMod: (userIdOrEmail) => removeMod(userIdOrEmail),
+    listMods: () => listMods(),
+    grantLikes: (featureId, targetUserId, n) => grantLikes(featureId, targetUserId, n),
+    openProfile: (userId) => openProfile(userId),
+    setNearbyUsers: (rows) => setNearbyUsers(rows),
     get STAMP_LOCK_MS() { return STAMP_LOCK_MS; },
     get LEVEL_L2_MIN() { return LEVEL_L2_MIN; },
     get LEVEL_L3_MIN() { return LEVEL_L3_MIN; }
@@ -1256,6 +1623,7 @@
       fleet: [],
       paths: [],
       likes: [],
+      mods: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
       profiles: {},
@@ -1286,6 +1654,7 @@
           if (!Array.isArray(s.fleet)) s.fleet = [];
           if (!Array.isArray(s.paths)) s.paths = [];
           if (!Array.isArray(s.likes)) s.likes = [];
+          if (!Array.isArray(s.mods)) s.mods = [];
           if (!s.profiles || typeof s.profiles !== 'object') s.profiles = {};
           return s;
         }
@@ -1304,6 +1673,7 @@
       fleet: state.fleet || [],
       paths: state.paths || [],
       likes: state.likes || [],
+      mods: state.mods || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
       profiles: state.profiles || {},
@@ -1345,6 +1715,7 @@
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
     state.paths = mergeById(state.paths || [], remote.paths || []);
     state.likes = mergeById(state.likes || [], remote.likes || []);
+    state.mods = mergeMods(state.mods || [], remote.mods || []);
     state.profiles = mergeProfiles(state.profiles || {}, remote.profiles || {});
     rebindPathDraft();
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
@@ -1564,6 +1935,7 @@
     updateProfileProgress();
     ensureDisplayNameSeeded();
     updateSocialCreditUi();
+    syncViewedProfileUi();
   }
   function applyRole(next) {
     if (!isKnownRole(next)) return;
@@ -2783,7 +3155,10 @@
   }
 
   function bind() {
-    document.getElementById('roleBtn').addEventListener('click', () => openSheet('roleSheet'));
+    document.getElementById('roleBtn').addEventListener('click', () => {
+      viewingUserId = null;
+      openSheet('roleSheet');
+    });
     const nearbyBtn = document.getElementById('nearbyBtn');
     if (nearbyBtn) {
       nearbyBtn.addEventListener('click', (e) => {
@@ -2929,6 +3304,29 @@
     if (googleOut) {
       googleOut.addEventListener('click', () => signOutGoogle());
     }
+    const modAddBtn = document.getElementById('modAddBtn');
+    const modAddInput = document.getElementById('modAddInput');
+    if (modAddBtn && modAddInput) {
+      const doAdd = () => {
+        const v = (modAddInput.value || '').trim();
+        if (!v) { ui.toast('Enter user id or email'); return; }
+        if (addMod(v)) modAddInput.value = '';
+      };
+      modAddBtn.addEventListener('click', doAdd);
+      modAddInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+      });
+    }
+    const grantBtn = document.getElementById('viewedGrantLikesBtn');
+    const grantInput = document.getElementById('viewedGrantLikesN');
+    if (grantBtn) {
+      grantBtn.addEventListener('click', () => {
+        if (!viewingUserId || !myIsMod()) return;
+        const n = grantInput ? grantInput.value : 1;
+        const fid = 'mod-grant-' + viewingUserId + '-' + Date.now();
+        if (grantLikes(fid, viewingUserId, n)) ui.toast('Granted likes');
+      });
+    }
     function promptGoogleSignIn() {
       if (googleSignedIn()) {
         syncGoogleAuthUi();
@@ -2976,6 +3374,7 @@
     if (!Array.isArray(state.fleet)) state.fleet = [];
     if (!Array.isArray(state.paths)) state.paths = [];
     if (!Array.isArray(state.likes)) state.likes = [];
+    if (!Array.isArray(state.mods)) state.mods = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     machineMarkers = {};
     accCircle = null;
@@ -2997,6 +3396,8 @@
     state = loadJob(code, emptyState(code));
     state.job = code;
     if (!Array.isArray(state.paths)) state.paths = [];
+    if (!Array.isArray(state.likes)) state.likes = [];
+    if (!Array.isArray(state.mods)) state.mods = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     if (snap) applyRemote(Object.assign({}, snap, { job: code, v: VERSION }));
     /* strip legacy job codes / snapshots from the URL so drivers see a clean link */
@@ -3028,8 +3429,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v32').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=32')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v33').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=33')).catch(() => {});
   }
 
   function showBootError(msg) {

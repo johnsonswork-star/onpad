@@ -1324,3 +1324,114 @@ button.placer-chip {
   cursor: pointer;
 }
 .nearby-empty { opacity: 0.7; font-size: 13px; }
+
+/* Founder / mods / viewed profile (v=33) */
+.profile-sheet-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.profile-role-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 2px solid var(--edge);
+  vertical-align: middle;
+}
+.profile-role-badge.is-founder {
+  background: #3a2a10;
+  border-color: var(--brass);
+  color: var(--brass);
+}
+.profile-role-badge.is-mod {
+  background: #1a3020;
+  border-color: #5aaa40;
+  color: #b6f08a;
+}
+.viewed-profile-card {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  background: #1a1612;
+  text-align: center;
+}
+.viewed-profile-name {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--safety);
+}
+.viewed-profile-meta {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #d0c4b4;
+}
+.viewed-profile-level { margin: 8px 0; }
+.viewed-profile-id {
+  display: inline-block;
+  margin: 6px 0 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.viewed-grant-likes { margin: 10px 0 12px; text-align: left; }
+.viewed-grant-row, .mods-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.viewed-grant-row .name-input,
+.mods-add-row .name-input { flex: 1; margin-bottom: 0; }
+.grant-likes-n { max-width: 120px; text-align: center; }
+.profile-subhead {
+  margin: 16px 0 8px;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brass);
+  text-align: left;
+}
+.nearby-users-section, .mods-section { margin-top: 8px; text-align: left; }
+.nearby-users-list, .mods-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nearby-user-btn { width: 100%; }
+.mods-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 2px solid var(--edge);
+  border-radius: 10px;
+  background: #140f0c;
+}
+.mods-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 14px;
+}
+.mods-remove { flex-shrink: 0; min-height: 44px; padding: 0 12px; }
+.mods-empty {
+  padding: 10px;
+  color: #a89888;
+  font-weight: 700;
+  text-align: center;
+}

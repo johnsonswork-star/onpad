@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=32" />
+  <link rel="stylesheet" href="css/app.css?v=33" />
 </head>
 <body>
   <div id="app">
@@ -225,7 +225,24 @@
   <!-- Profile sheet — same entry as role (#roleBtn). No second nav. -->
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
-      <h2>Profile</h2>
+      <h2 class="profile-sheet-title">Profile <span id="profileRoleBadge" class="profile-role-badge" hidden></span></h2>
+
+      <div id="viewedProfileCard" class="viewed-profile-card" hidden>
+        <p id="viewedProfileName" class="viewed-profile-name">—</p>
+        <p id="viewedProfileRole" class="viewed-profile-meta">Role · —</p>
+        <p id="viewedProfileLevel" class="viewed-profile-level social-credit-level" title="L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received">Level L1 · 0 likes</p>
+        <p id="viewedProfileId" class="viewed-profile-id userid-chip" title="">—</p>
+        <div id="viewedGrantLikes" class="viewed-grant-likes" hidden>
+          <label class="profile-label" for="viewedGrantLikesN">Grant likes (mods)</label>
+          <div class="viewed-grant-row">
+            <input id="viewedGrantLikesN" class="name-input grant-likes-n" type="number" min="1" max="10000" value="1" inputmode="numeric" />
+            <button type="button" id="viewedGrantLikesBtn" class="fat primary">Grant</button>
+          </div>
+        </div>
+        <button type="button" id="viewedProfileBack" class="fat">Back to my profile</button>
+      </div>
+
+      <div data-own-profile-only>
       <div class="profile-progress" id="profileProgress" aria-live="polite">
         <div class="profile-progress-top">
           <span class="profile-progress-label" id="profileProgressLabel">Profile 0/3</span>
@@ -276,6 +293,23 @@
         <span id="userIdChip" class="userid-chip" title="Account id"></span>
       </div>
       <p class="hint profile-hint">Sign in with Google is required. Add your name so claims show who you are. Tap Continue after you set role and name.</p>
+      </div>
+
+      <div id="nearbyUsersSection" class="nearby-users-section" hidden>
+        <h3 class="profile-subhead">Nearby</h3>
+        <ul id="nearbyUsersList" class="nearby-users-list"></ul>
+      </div>
+
+      <div id="modsSection" class="mods-section" hidden>
+        <h3 class="profile-subhead">Mods</h3>
+        <ul id="modsList" class="mods-list"></ul>
+        <label class="profile-label" for="modAddInput">Add mod (user id or email)</label>
+        <div class="mods-add-row">
+          <input id="modAddInput" class="name-input" type="text" autocomplete="off" placeholder="user id or email" enterkeyhint="done" />
+          <button type="button" id="modAddBtn" class="fat primary">Add</button>
+        </div>
+      </div>
+
       <button type="button" class="sheet-close" data-close="roleSheet">Close</button>
     </div>
   </div>
@@ -303,6 +337,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=32"></script>
+  <script src="js/app.js?v=33"></script>
 </body>
 </html>
