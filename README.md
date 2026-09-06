@@ -36,7 +36,7 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=28`, service worker `onpad-v28`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=29`, service worker `onpad-v29`).
 
 
 ## Profile stamp API (App Builder)
@@ -73,7 +73,7 @@ window.OnPadAccount = {
 };
 ```
 
-Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock + map like/dislike/report (cache **v=27**). Profile social ladder is **?v=28**.
+Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock + map like/dislike/report (cache **v=27**). Profile social ladder is **?v=29**.
 
 ## Social credit levels
 

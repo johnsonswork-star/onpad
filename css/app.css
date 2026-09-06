@@ -1250,3 +1250,5 @@ body.auth-gated #authGate { pointer-events: auto; }
 .act.mod.keep { background: #1a3020; color: #b6f08a; border-color: #3a6a30; }
 .act.mod.drop { background: #3a1818; color: #ffb0a8; border-color: #8a3030; }
 .selected-actions { flex-wrap: wrap; max-width: 100%; }
+
+.act.social.grant { background: #2a3040; border-color: #5a7090; color: #c8e0ff; font-weight: 800; font-size: 11px; }
