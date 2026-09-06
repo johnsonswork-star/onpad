@@ -722,6 +722,14 @@
       '</div>' + objScore + placer + ownerScore + '</div>';
   }
 
+  function clickIsMarkerName(e) {
+    try {
+      const t = (e && e.originalEvent && e.originalEvent.target) || (e && e.target);
+      if (!t || !t.closest) return false;
+      return !!t.closest('.marker-name');
+    } catch (err) { return false; }
+  }
+
   function openUserProfile(userId) {
     const id = String(userId || '').trim();
     if (!id) return false;
@@ -1816,6 +1824,14 @@
     featureBags().forEach((arr) => {
       (arr || []).forEach((f) => { if (f && f.id === featureId) found = f; });
     });
+    if (!found && state.machines) {
+      Object.keys(state.machines).forEach((k) => {
+        const m = state.machines[k];
+        if (!m || m.gone) return;
+        const mid = m.id || m.userId || m.by || k;
+        if (mid === featureId || k === featureId) found = m;
+      });
+    }
     return found;
   }
   function ensureReactionArrays(f) {
@@ -1830,7 +1846,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=40: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=41: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -3822,7 +3838,12 @@
       }).addTo(layers.fleet);
       m.on('click', (e) => {
         L.DomEvent.stop(e);
-        /* P2: object tap → sheet (Like/Dislike/Flag); name chip → profile */
+        /* Body → object sheet; name label → profile */
+        if (clickIsMarkerName(e)) {
+          const uid = f.userId || f.by || '';
+          if (uid) openUserProfile(uid);
+          return;
+        }
         select({ kind: 'fleet', id: f.id });
       });
       wirePixelDrag(m, () => state.fleet, f.id);
@@ -3860,6 +3881,7 @@
     if (!id) return;
     const name = (displayName() || googleName() || '').trim();
     state.machines[id] = {
+      id: id,
       lat: pos.lat,
       lng: pos.lng,
       hdg: pos.heading,
@@ -3901,9 +3923,15 @@
         }).addTo(layers.machines);
         machineMarkers[key].on('click', (e) => {
           L.DomEvent.stop(e);
-          const id = m.userId || m.by || uid;
-          if (id) openUserProfile(id);
-          else ui.toast(presenceDisplayName(m));
+          const id = m.userId || m.by || uid || key;
+          if (!m.id) m.id = id;
+          /* Body → live object sheet; name label → profile */
+          if (clickIsMarkerName(e)) {
+            if (id) openUserProfile(id);
+            else ui.toast(presenceDisplayName(m));
+            return;
+          }
+          select({ kind: 'machine', id: key });
         });
       } else {
         machineMarkers[key].setLatLng([m.lat, m.lng]);
@@ -3945,6 +3973,7 @@
     drawPaths();
     drawDigPads();
     drawFleet();
+    try { drawMachines(); } catch (eDm) {}
     const bar = document.getElementById('selectedBar');
     const meta = document.getElementById('selectedMeta');
     const acts = document.getElementById('selectedActions');
@@ -4025,6 +4054,18 @@
         metaWithPlacer('<span>' + machineName + ' · LAST KNOWN</span>', f);
       appendSocialActions(acts, state.fleet, f);
       appendKillOrLock(acts, f, () => removeItem(state.fleet, f));
+    } else if (sel.kind === 'machine') {
+      /* Live GPS presence — object sheet (Like/Dislike/Flag); name → profile */
+      const key = sel.id;
+      const m = state.machines && state.machines[key];
+      if (!m || m.gone || m.lat == null) { bar.hidden = true; return; }
+      const uid = m.userId || m.by || key;
+      if (!m.id) m.id = uid;
+      ensureReactionArrays(m);
+      const roleKey = m.role || m.byRole || '';
+      const title = '<span>' + escHtml((ROLE_LABEL[roleKey] || roleKey || 'LIVE').toUpperCase()) + ' · LIVE</span>';
+      meta.innerHTML = roleSvg(roleKey) + metaWithPlacer(title, m);
+      appendSocialActions(acts, null, m);
     } else if (sel.kind === 'path') {
       const p = findById(state.paths || [], sel.id);
       if (!p) { bar.hidden = true; return; }
@@ -4525,8 +4566,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v40').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=40')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v41').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=41')).catch(() => {});
   }
 
   function showBootError(msg) {
