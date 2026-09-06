@@ -233,6 +233,20 @@
     ui.toast('Signed out');
   }
 
+  function gisButtonPresent() {
+    const host = document.getElementById('googleSignInBtn');
+    if (!host || host.hidden) return false;
+    return !!host.querySelector('iframe, div[role="button"], div[aria-labelledby]');
+  }
+
+  function syncGoogleFallback() {
+    const fallback = document.getElementById('googleSignInFallback');
+    if (!fallback) return;
+    const inGoogle = googleSignedIn();
+    const show = !inGoogle && !gisButtonPresent();
+    fallback.hidden = !show;
+  }
+
   function syncGoogleAuthUi() {
     const host = document.getElementById('googleSignInBtn');
     const signed = document.getElementById('googleSignedIn');
@@ -255,6 +269,7 @@
       }
       chip.setAttribute('title', em ? (n + ' <' + em + '>') : n);
     }
+    syncGoogleFallback();
     if (!inGoogle) initGoogleSignIn(false);
   }
 
@@ -265,6 +280,7 @@
     if (forceRerender) {
       host.innerHTML = '';
       googleBtnRendered = false;
+      syncGoogleFallback();
     }
     function tryRender() {
       if (!(window.google && google.accounts && google.accounts.id)) return false;
@@ -290,6 +306,7 @@
             width: w
           });
           googleBtnRendered = true;
+          syncGoogleFallback();
         }
         return true;
       } catch (e) {
@@ -867,16 +884,21 @@
     role() {
       const btn = document.getElementById('roleBtn');
       const name = displayName();
-      btn.className = 'identity role-' + role + (name ? ' named' : '');
+      const inGoogle = googleSignedIn();
+      btn.className = 'identity role-' + role + (name ? ' named' : '') + (inGoogle ? ' google-in' : ' google-out');
       const kicker = btn.querySelector('.identity-kicker');
       const sub = btn.querySelector('.identity-sub');
       document.getElementById('roleLabel').textContent = ROLE_LABEL[role] || role;
       if (name) {
         if (kicker) kicker.textContent = name;
-        if (sub) sub.textContent = '';
+        /* Named: keep role identity; when not signed in, hint via sub (CSS shows it for google-out) */
+        if (sub) sub.textContent = inGoogle ? '' : 'TAP · SIGN IN';
       } else {
         if (kicker) kicker.textContent = "I'M THE";
-        if (sub) sub.textContent = isMachineRole(role) ? 'OPERATOR' : '';
+        if (sub) {
+          if (!inGoogle) sub.textContent = 'TAP · SIGN IN';
+          else sub.textContent = isMachineRole(role) ? 'OPERATOR' : '';
+        }
       }
       const stake = document.getElementById('stakeRow');
       if (stake) stake.style.display = role === 'dozer' ? 'flex' : 'none';
@@ -907,8 +929,16 @@
   };
 
   function openSheet(id) {
-    if (id === 'roleSheet') syncProfileSheet();
-    document.getElementById(id).hidden = false;
+    const el = document.getElementById(id);
+    if (!el) return;
+    /* Unhide before GIS renderButton so host width is real (phones got ~0 when hidden). */
+    el.hidden = false;
+    if (id === 'roleSheet') {
+      syncProfileSheet();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => initGoogleSignIn(true));
+      });
+    }
   }
   function closeSheet(id) { document.getElementById(id).hidden = true; }
 
@@ -2177,6 +2207,25 @@
     if (googleOut) {
       googleOut.addEventListener('click', () => signOutGoogle());
     }
+    const googleFb = document.getElementById('googleSignInFallback');
+    if (googleFb) {
+      googleFb.addEventListener('click', () => {
+        if (googleSignedIn()) {
+          syncGoogleAuthUi();
+          return;
+        }
+        const gisReady = !!(window.google && google.accounts && google.accounts.id);
+        if (!gisReady) {
+          ui.toast('Loading Google…');
+          initGoogleSignIn(true);
+          return;
+        }
+        initGoogleSignIn(true);
+        try {
+          google.accounts.id.prompt();
+        } catch (e) { /* renderButton is the primary path */ }
+      });
+    }
     initGoogleSignIn(false);
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
@@ -2254,8 +2303,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v23').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=23')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v24').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=24')).catch(() => {});
   }
 
   function showBootError(msg) {

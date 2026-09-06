@@ -36,7 +36,7 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=23`, service worker `onpad-v23`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=24`, service worker `onpad-v24`).
 
 
 ## Profile stamp API (App Builder)

@@ -141,6 +141,16 @@ body.truck-open .leaflet-bottom {
   max-width: 68vw;
 }
 .identity.named .identity-sub { display: none; }
+.identity.named.google-out .identity-sub {
+  display: block;
+  color: var(--brass);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.identity.google-out:not(.named) .identity-sub {
+  color: var(--brass);
+  font-weight: 800;
+}
 .role-dozer { color: var(--dozer); border-color: #a88820; }
 .role-excavator { color: var(--excavator); border-color: #a05020; }
 .role-water { color: var(--water-role); border-color: #2a6a90; }
@@ -1093,7 +1103,25 @@ body.truck-open .rail {
   border-radius: 12px;
   background: var(--dirt-2);
 }
-.google-auth .profile-label { margin-bottom: 10px; }
+.google-auth .profile-label { margin-bottom: 6px; }
+.google-auth-rec {
+  margin: 0 0 12px;
+  color: var(--brass);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+.google-signin-fallback {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 8px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 17px;
+}
+.google-signin-fallback[hidden] { display: none !important; }
+.google-btn-host:not(:empty) + .google-signin-fallback { display: none !important; }
 .google-btn-host {
   min-height: 56px;
   display: flex;
