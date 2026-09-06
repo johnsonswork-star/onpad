@@ -451,8 +451,253 @@
     return note;
   }
   function appendKillOrLock(acts, item, onKill) {
+    /* Own stamps only — never delete others (report/auto-mod instead). */
+    if (!isOwnStamp(item)) return;
     if (isSoftLocked(item)) acts.appendChild(lockNoteEl());
     else acts.appendChild(killBtn(onKill));
+  }
+
+  function isOwnStamp(item) {
+    if (!item) return false;
+    const me = currentUserId();
+    if (!me) return false;
+    const owner = item.userId || item.by || '';
+    return !!(owner && owner === me);
+  }
+
+  function currentUserId() {
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.userId === 'function') {
+        const id = window.OnPadAccount.userId();
+        if (id) return id;
+      }
+    } catch (e) {}
+    return localUserId();
+  }
+
+  /* Levels — prefer Profile OnPadAccount (?v=28+). Stub: L1 unless localStorage override.
+     Cutoffs (Chris): L1 0–999, L2 1k–4999, L3 5000+ likes received. */
+  function levelFromLikes(n) {
+    const x = Number(n) || 0;
+    if (x >= 5000) return 3;
+    if (x >= 1000) return 2;
+    return 1;
+  }
+  function stubLevel(userId) {
+    const id = userId || currentUserId();
+    try {
+      const raw = localStorage.getItem('onpad:level:' + id);
+      if (raw != null && raw !== '') {
+        const n = parseInt(raw, 10);
+        if (n >= 1) return n;
+      }
+      const likes = parseInt(localStorage.getItem('onpad:likesReceived:' + id) || '0', 10) || 0;
+      return levelFromLikes(likes);
+    } catch (e) {
+      return 1;
+    }
+  }
+  function myLevel() {
+    try {
+      if (window.OnPadAccount) {
+        if (typeof window.OnPadAccount.myLevel === 'function') {
+          const n = window.OnPadAccount.myLevel();
+          if (typeof n === 'number' && n >= 1) return n;
+        }
+        if (typeof window.OnPadAccount.getLevel === 'function') {
+          const n = window.OnPadAccount.getLevel();
+          if (typeof n === 'number' && n >= 1) return n;
+        }
+        if (typeof window.OnPadAccount.level === 'function') {
+          const n = window.OnPadAccount.level(currentUserId());
+          if (typeof n === 'number' && n >= 1) return n;
+        }
+      }
+    } catch (e) {}
+    return stubLevel(currentUserId());
+  }
+  function userLevel(userId) {
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.level === 'function') {
+        const n = window.OnPadAccount.level(userId);
+        if (typeof n === 'number' && n >= 1) return n;
+      }
+    } catch (e) {}
+    return stubLevel(userId);
+  }
+  function canAutoDeleteReport(reporterId) {
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.canAutoDeleteReport === 'function') {
+        return !!window.OnPadAccount.canAutoDeleteReport(reporterId || currentUserId());
+      }
+    } catch (e) {}
+    return userLevel(reporterId || currentUserId()) >= 3;
+  }
+  function isBoardVoter(userId) {
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.isBoardVoter === 'function') {
+        return !!window.OnPadAccount.isBoardVoter(userId || currentUserId());
+      }
+    } catch (e) {}
+    /* v1: any signed-in user */
+    return googleSignedIn() || !!(userId || currentUserId());
+  }
+
+  function ensureVoteArr(item, key) {
+    if (!item[key] || !Array.isArray(item[key])) item[key] = [];
+    return item[key];
+  }
+  function voteIndex(arr, by) {
+    return (arr || []).findIndex((v) => v && v.by === by);
+  }
+  function mergeVoteArr(a, b) {
+    const map = new Map();
+    (a || []).forEach((v) => { if (v && v.by) map.set(v.by, v); });
+    (b || []).forEach((v) => {
+      if (!v || !v.by) return;
+      const cur = map.get(v.by);
+      if (!cur || (v.at || 0) >= (cur.at || 0)) map.set(v.by, v);
+    });
+    return [...map.values()];
+  }
+  function mergeSocial(from, onto) {
+    if (!from || !onto) return onto;
+    onto.likes = mergeVoteArr(onto.likes, from.likes);
+    onto.dislikes = mergeVoteArr(onto.dislikes, from.dislikes);
+    onto.reports = mergeVoteArr(onto.reports, from.reports);
+    onto.modVotes = mergeVoteArr(onto.modVotes, from.modVotes);
+    return onto;
+  }
+  function ownerIdOf(item) {
+    return (item && (item.userId || item.by)) || '';
+  }
+  function toggleLike(item) {
+    if (!item || item.gone) return;
+    const me = currentUserId();
+    if (!me) { ui.toast('Sign in to like'); return; }
+    const likes = ensureVoteArr(item, 'likes');
+    const dislikes = ensureVoteArr(item, 'dislikes');
+    const di = voteIndex(dislikes, me);
+    if (di >= 0) dislikes.splice(di, 1);
+    const i = voteIndex(likes, me);
+    if (i >= 0) {
+      likes.splice(i, 1);
+    } else {
+      likes.push({ by: me, at: Date.now() });
+      try {
+        if (window.OnPadAccount && typeof window.OnPadAccount.recordLike === 'function') {
+          window.OnPadAccount.recordLike(item.id, ownerIdOf(item));
+        } else {
+          const oid = ownerIdOf(item);
+          if (oid) {
+            const k = 'onpad:likesReceived:' + oid;
+            const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1;
+            localStorage.setItem(k, String(n));
+          }
+        }
+      } catch (e) {}
+    }
+    item.u = now();
+    persist();
+  }
+  function toggleDislike(item) {
+    if (!item || item.gone) return;
+    const me = currentUserId();
+    if (!me) { ui.toast('Sign in to dislike'); return; }
+    const likes = ensureVoteArr(item, 'likes');
+    const dislikes = ensureVoteArr(item, 'dislikes');
+    const li = voteIndex(likes, me);
+    if (li >= 0) likes.splice(li, 1);
+    const i = voteIndex(dislikes, me);
+    if (i >= 0) dislikes.splice(i, 1);
+    else dislikes.push({ by: me, at: Date.now() });
+    item.u = now();
+    persist();
+  }
+  function reportItem(arr, item) {
+    if (!item || item.gone) return;
+    const me = currentUserId();
+    if (!me) { ui.toast('Sign in to report'); return; }
+    const reports = ensureVoteArr(item, 'reports');
+    if (voteIndex(reports, me) >= 0) {
+      ui.toast('Already reported');
+      return;
+    }
+    reports.push({ by: me, at: Date.now() });
+    item.u = now();
+    if (canAutoDeleteReport(me)) {
+      ui.toast('Report accepted — removed (L3+)');
+      forceRemove(arr, item);
+      return;
+    }
+    persist();
+    ui.toast('Reported — review board (need 3 votes)');
+    select(selected);
+  }
+  function castModVote(arr, item, vote) {
+    if (!item || item.gone) return;
+    const me = currentUserId();
+    if (!me || !isBoardVoter(me)) {
+      ui.toast('Sign in to vote');
+      return;
+    }
+    if (!(item.reports && item.reports.length)) {
+      ui.toast('Nothing to review');
+      return;
+    }
+    const votes = ensureVoteArr(item, 'modVotes');
+    const i = voteIndex(votes, me);
+    if (i >= 0) votes[i] = { by: me, at: Date.now(), vote: vote };
+    else votes.push({ by: me, at: Date.now(), vote: vote });
+    item.u = now();
+    const del = votes.filter((v) => v.vote === 'delete').length;
+    const keep = votes.filter((v) => v.vote === 'keep').length;
+    if (votes.length >= 3) {
+      if (del > keep) {
+        ui.toast('Board: delete');
+        forceRemove(arr, item);
+        return;
+      }
+      if (keep > del) {
+        item.reports = [];
+        item.modVotes = [];
+        item.u = now();
+        persist();
+        ui.toast('Board: keep');
+        select(selected);
+        return;
+      }
+    }
+    persist();
+    select(selected);
+  }
+  function appendSocialActions(acts, arr, item) {
+    if (!item || item.gone) return;
+    const me = currentUserId();
+    const likes = item.likes || [];
+    const dislikes = item.dislikes || [];
+    const reports = item.reports || [];
+    const liked = me && voteIndex(likes, me) >= 0;
+    const disliked = me && voteIndex(dislikes, me) >= 0;
+    const likeB = actBtn('👍' + (likes.length ? ' ' + likes.length : ''), liked ? 'social on' : 'social', () => {
+      toggleLike(item);
+      select(selected);
+    });
+    const disB = actBtn('👎' + (dislikes.length ? ' ' + dislikes.length : ''), disliked ? 'social on' : 'social', () => {
+      toggleDislike(item);
+      select(selected);
+    });
+    const repB = actBtn('⚑' + (reports.length ? ' ' + reports.length : ''), 'social report', () => reportItem(arr, item));
+    acts.appendChild(likeB);
+    acts.appendChild(disB);
+    acts.appendChild(repB);
+    if (reports.length) {
+      const votes = item.modVotes || [];
+      const delN = votes.filter((v) => v.vote === 'delete').length;
+      const keepN = votes.filter((v) => v.vote === 'keep').length;
+      acts.appendChild(actBtn('KEEP ' + keepN, 'mod keep', () => castModVote(arr, item, 'keep')));
+      acts.appendChild(actBtn('DROP ' + delN, 'mod drop', () => castModVote(arr, item, 'delete')));
+    }
   }
   function preserveStamp(from, onto) {
     if (!from) return onto;
@@ -472,6 +717,8 @@
     if (from.completedByName != null) onto.completedByName = from.completedByName;
     if (from.completedByRole != null) onto.completedByRole = from.completedByRole;
     if (from.completedAt != null) onto.completedAt = from.completedAt;
+    mergeSocial(from, onto);
+    if (from.name != null && onto.name == null) onto.name = from.name;
     return onto;
   }
   function earlierStamp(a, b) {
@@ -644,6 +891,27 @@
     profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
     signedIn: () => googleSignedIn(),
     signOut: () => signOutGoogle(),
+    myLevel: () => stubLevel(localUserId()),
+    level: (userId) => stubLevel(userId),
+    getLevel: () => stubLevel(localUserId()),
+    likesReceived: (userId) => {
+      try { return parseInt(localStorage.getItem('onpad:likesReceived:' + (userId || localUserId())) || '0', 10) || 0; }
+      catch (e) { return 0; }
+    },
+    recordLike: (featureId, targetUserId) => {
+      try {
+        const oid = targetUserId || '';
+        if (!oid || !featureId) return;
+        const seenK = 'onpad:likeSeen:' + featureId + ':' + localUserId();
+        if (localStorage.getItem(seenK) === '1') return;
+        localStorage.setItem(seenK, '1');
+        const k = 'onpad:likesReceived:' + oid;
+        const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1;
+        localStorage.setItem(k, String(n));
+      } catch (e) {}
+    },
+    canAutoDeleteReport: (reporterId) => stubLevel(reporterId || localUserId()) >= 3,
+    isBoardVoter: (userId) => googleSignedIn() || !!(userId || localUserId()),
     get STAMP_LOCK_MS() { return STAMP_LOCK_MS; }
   };
 
@@ -767,7 +1035,11 @@
         const next = Object.assign({}, x);
         /* Never overwrite original placer identity (userId/by/stampedAt). */
         preserveStamp(earlierStamp(cur, x), next);
+        mergeSocial(cur, next);
         map.set(x.id, next);
+      } else {
+        /* Equal or older remote — still union social votes for LIVE */
+        mergeSocial(x, cur);
       }
     });
     return [...map.values()];
@@ -1858,11 +2130,19 @@
   /* fleet — manually placed machine markers (not GPS "me") */
   function placeFleet(kind, latlng) {
     if (!state.fleet) state.fleet = [];
-    const name = ROLE_LABEL[kind] || kind;
+    const def = ROLE_LABEL[kind] || kind;
+    let name = '';
+    try {
+      name = (window.prompt('Name this ' + def + ' (required)', def) || '').replace(/\s+/g, ' ').trim().slice(0, 32);
+    } catch (e) { name = ''; }
+    if (!name) {
+      ui.toast('Name required — not placed');
+      return;
+    }
     const item = stamp({
       id: uid(),
       role: kind,
-      name: name, /* simple temp machine profile — just the machine name */
+      name: name,
       lat: latlng.lat,
       lng: latlng.lng,
       u: now()
@@ -2032,6 +2312,7 @@
         /* ✓ = complete & KEEP ghost history — never delete */
         acts.appendChild(actBtn('✓', 'ok', () => completeOrder(r)));
       }
+      appendSocialActions(acts, state.requests, r);
       appendKillOrLock(acts, r, () => removeItem(state.requests, r));
     } else if (sel.kind === 'dig') {
       const d = findById(state.digPads, sel.id);
@@ -2050,6 +2331,7 @@
       const machineName = (f.name || ROLE_LABEL[f.role] || f.role || 'Machine').toUpperCase();
       meta.innerHTML = roleSvg(f.role) +
         metaWithPlacer('<span>' + machineName + ' · LAST KNOWN</span>', f);
+      appendSocialActions(acts, state.fleet, f);
       appendKillOrLock(acts, f, () => removeItem(state.fleet, f));
     } else if (sel.kind === 'path') {
       const p = findById(state.paths || [], sel.id);
@@ -2073,11 +2355,22 @@
   function killBtn(fn) { return actBtn('✕', 'kill', fn); }
 
   function removeItem(arr, item) {
+    /* Ownership: only owner may hard-delete via ✕. Moderation paths call forceRemove. */
+    if (!item._forceRemove && !isOwnStamp(item)) {
+      ui.toast("Can't delete — not yours");
+      return;
+    }
+    delete item._forceRemove;
     item.gone = true;
     item.u = now();
     selected = null;
     persist();
     select(null); /* X clears selection + hides bar (idle default) */
+  }
+  function forceRemove(arr, item) {
+    if (!item) return;
+    item._forceRemove = true;
+    removeItem(arr, item);
   }
 
   function renderAll() {
@@ -2419,8 +2712,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v26').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=26')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v27').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=27')).catch(() => {});
   }
 
   function showBootError(msg) {

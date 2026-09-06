@@ -1225,3 +1225,12 @@ body.auth-gated #app {
 }
 body.auth-gated #authGate { pointer-events: auto; }
 
+
+/* Social credit controls */
+.act.social { background: #2a241c; color: var(--safety); border-color: #5a4a30; font-size: 13px; min-width: 40px; }
+.act.social.on { background: #3a5020; border-color: #7aaa40; color: #e8ffb0; }
+.act.social.report { background: #3a2018; border-color: #8a4030; color: #ffc8a0; }
+.act.mod { font-size: 11px; font-weight: 800; }
+.act.mod.keep { background: #1a3020; color: #b6f08a; border-color: #3a6a30; }
+.act.mod.drop { background: #3a1818; color: #ffb0a8; border-color: #8a3030; }
+.selected-actions { flex-wrap: wrap; max-width: 100%; }
