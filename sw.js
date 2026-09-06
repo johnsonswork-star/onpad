@@ -1,10 +1,10 @@
-/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=26 Google required + claim name stamps) */
-const CACHE = 'onpad-v27';
+/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=28 social credit levels) */
+const CACHE = 'onpad-v28';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=27',
-  './js/app.js?v=27',
+  './css/app.css?v=28',
+  './js/app.js?v=28',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
