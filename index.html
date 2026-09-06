@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=38" />
+  <link rel="stylesheet" href="css/app.css?v=39" />
 </head>
 <body>
   <div id="app">
@@ -37,6 +37,7 @@
         <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
         <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
         <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view">NEARBY</button>
+        <span id="modToolsChip" class="badge mod-tools-chip" hidden title="Mod tools active for this session">Tools on</span>
       </div>
     </header>
 
@@ -246,22 +247,56 @@
     <div class="sheet-card">
       <h2 class="profile-sheet-title">Profile <span id="profileRoleBadge" class="profile-role-badge" hidden></span></h2>
 
+      <!-- Score first (own + openProfile) — SITE_OPS §6 -->
+      <div id="profileScoreHeader" class="profile-score-header" aria-live="polite">
+        <div id="profileScoreNet" class="profile-score-net">+0</div>
+        <div id="profileScoreCounts" class="profile-score-counts">▲ 0  ▼ 0</div>
+        <div id="profileScoreTrend" class="profile-score-trend" title="Likes/dislikes in last 24 hours vs all-time">24h · ▲ 0  ▼ 0</div>
+        <h3 class="profile-subhead profile-rated-head">Recent rated</h3>
+        <ul id="profileRatedList" class="profile-rated-list"></ul>
+        <div id="profileHoursMachines" class="profile-hours-machines">
+          <span id="profileHoursStub">Hours · —</span>
+          <span id="profileMachinesStub">Machines · —</span>
+        </div>
+      </div>
+
+      <div id="restrictionHistorySection" class="restriction-history" hidden>
+        <h3 class="profile-subhead">Restriction history</h3>
+        <ul id="restrictionHistoryList" class="restriction-history-list"></ul>
+      </div>
+
       <div id="viewedProfileCard" class="viewed-profile-card" hidden>
         <p id="viewedProfileName" class="viewed-profile-name">—</p>
         <p id="viewedProfileRole" class="viewed-profile-meta">Role · —</p>
-        <p id="viewedProfileLevel" class="viewed-profile-level social-credit-level" title="L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received">Level L1 · 0 likes · 0 dislikes</p>
+        <p id="viewedProfileLevel" class="viewed-profile-level social-credit-level" title="L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received" hidden>Level L1 · 0 likes · 0 dislikes</p>
         <p id="viewedProfileId" class="viewed-profile-id userid-chip" title="">—</p>
-        <div id="viewedGrantLikes" class="viewed-grant-likes" hidden>
-          <label class="profile-label" for="viewedGrantLikesN">Grant likes (mods)</label>
-          <div class="viewed-grant-row">
-            <input id="viewedGrantLikesN" class="name-input grant-likes-n" type="number" min="1" max="10000" value="1" inputmode="numeric" />
-            <button type="button" id="viewedGrantLikesBtn" class="fat primary">Grant</button>
+        <div id="viewedModTools" class="viewed-mod-tools" hidden>
+          <h3 class="profile-subhead">Mod actions</h3>
+          <div class="mod-action-grid" id="viewedModActionGrid">
+            <button type="button" class="fat mod-action" data-restrict="warn">Warn</button>
+            <button type="button" class="fat mod-action" data-restrict="mute">Mute</button>
+            <button type="button" class="fat mod-action" data-restrict="tool">Tool restrict</button>
+            <button type="button" class="fat mod-action" data-restrict="movement">Movement restrict</button>
+            <button type="button" class="fat mod-action" data-restrict="kick">Kick</button>
+            <button type="button" class="fat mod-action" data-restrict="tempban">Temp ban</button>
+            <button type="button" class="fat mod-action danger" data-restrict="ban">Ban</button>
+          </div>
+          <div id="viewedGrantLikes" class="viewed-grant-likes" hidden>
+            <label class="profile-label" for="viewedGrantLikesN">Grant likes (mods)</label>
+            <div class="viewed-grant-row">
+              <input id="viewedGrantLikesN" class="name-input grant-likes-n" type="number" min="1" max="10000" value="1" inputmode="numeric" />
+              <button type="button" id="viewedGrantLikesBtn" class="fat primary">Grant</button>
+            </div>
           </div>
         </div>
         <button type="button" id="viewedProfileBack" class="fat">Back to my profile</button>
       </div>
 
       <div data-own-profile-only>
+      <div id="modToolsBar" class="mod-tools-bar" hidden>
+        <button type="button" id="modToolsToggle" class="fat">Mod tools</button>
+        <span class="hint mod-tools-hint">Session only · default off</span>
+      </div>
       <div class="profile-progress" id="profileProgress" aria-live="polite">
         <div class="profile-progress-top">
           <span class="profile-progress-label" id="profileProgressLabel">Profile 0/3</span>
@@ -275,7 +310,7 @@
           <li data-step="role">Role</li>
           <li data-step="ready">Ready</li>
         </ul>
-        <p id="socialCreditLevel" class="social-credit-level" title="L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received">Level L1 · 0 likes · 0 dislikes</p>
+        <p id="socialCreditLevel" class="social-credit-level" title="Legacy level ladder — score header is primary" hidden>Level L1 · 0 likes · 0 dislikes</p>
       </div>
       <div class="google-auth" id="googleAuthBlock">
         <label class="profile-label" for="googleSignInFallback">Sign in with Google</label>
@@ -356,6 +391,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=38"></script>
+  <script src="js/app.js?v=39"></script>
 </body>
 </html>

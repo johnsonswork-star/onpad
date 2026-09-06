@@ -1545,3 +1545,124 @@ body.shift-gated .tool {
 }
 body.shift-gated #shiftBar { display: none !important; }
 body.on-shift #shiftBar:not([hidden]) { display: flex; }
+
+
+/* ---- SITE OPS profile score + stealth mod tools + report queue (?v=39) ---- */
+.profile-score-header {
+  margin: 0 0 14px;
+  padding: 14px 12px 12px;
+  border: 3px solid var(--brass);
+  border-radius: 14px;
+  background: #241c12;
+  text-align: center;
+}
+.profile-score-net {
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--safety);
+  font-variant-numeric: tabular-nums;
+}
+.profile-score-net.is-pos { color: #b6f08a; }
+.profile-score-net.is-neg { color: #ff8a6a; }
+.profile-score-counts {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+.profile-score-trend {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8b8a4;
+  font-variant-numeric: tabular-nums;
+}
+.profile-rated-head { margin-top: 12px; text-align: left; }
+.profile-rated-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-rated-item,
+.profile-rated-empty {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--edge);
+  background: #140f0c;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8dcc8;
+}
+.profile-rated-empty { opacity: 0.7; text-align: center; }
+.profile-hours-machines {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a89888;
+}
+.mod-tools-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.mod-tools-bar .fat { flex: 1; }
+.mod-tools-hint { margin: 0; font-size: 12px; opacity: 0.75; }
+.badge.mod-tools-chip {
+  background: #1a3020;
+  border-color: #5aaa40;
+  color: #b6f08a;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.viewed-mod-tools {
+  margin: 10px 0 12px;
+  padding: 10px;
+  border: 2px dashed #5aaa40;
+  border-radius: 12px;
+  background: #121810;
+  text-align: left;
+}
+.mod-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mod-action-grid .fat { min-height: 48px; font-size: 14px; }
+.mod-action.danger {
+  grid-column: 1 / -1;
+  border-color: #a04030;
+  background: #3a1810;
+  color: #ffb0a0;
+}
+.restriction-history { margin: 0 0 12px; text-align: left; }
+.restriction-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.restriction-history-item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid #5a4030;
+  background: #1a1410;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e0c8b0;
+}
