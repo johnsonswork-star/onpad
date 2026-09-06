@@ -1,10 +1,10 @@
-/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=33 founder/mods API) */
-const CACHE = 'onpad-v34';
+/* OnPad service worker — only cache same-origin. Never touch map tiles. (v=35 likes+dislikes + LIVE presence names) */
+const CACHE = 'onpad-v35';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=34',
-  './js/app.js?v=34',
+  './css/app.css?v=35',
+  './js/app.js?v=35',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
