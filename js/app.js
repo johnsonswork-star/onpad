@@ -209,6 +209,7 @@
     syncProfileSheet();
     persist();
     ui.role();
+    syncAuthGate();
     ui.toast('Signed in with Google');
   }
 
@@ -229,22 +230,48 @@
     syncProfileSheet();
     persist();
     ui.role();
-    initGoogleSignIn(true);
+    syncAuthGate();
     ui.toast('Signed out');
   }
 
-  function gisButtonPresent() {
-    const host = document.getElementById('googleSignInBtn');
-    if (!host || host.hidden) return false;
-    return !!host.querySelector('iframe, div[role="button"], div[aria-labelledby]');
+  function activeGoogleHost() {
+    const gate = document.getElementById('authGate');
+    const gateHost = document.getElementById('authGateGoogleBtn');
+    if (gate && !gate.hidden && gateHost) return gateHost;
+    return document.getElementById('googleSignInBtn');
+  }
+
+  function gisButtonPresent(host) {
+    const el = host || activeGoogleHost();
+    if (!el || el.hidden) return false;
+    return !!el.querySelector('iframe, div[role="button"], div[aria-labelledby]');
   }
 
   function syncGoogleFallback() {
-    const fallback = document.getElementById('googleSignInFallback');
-    if (!fallback) return;
     const inGoogle = googleSignedIn();
-    const show = !inGoogle && !gisButtonPresent();
-    fallback.hidden = !show;
+    ['googleSignInFallback', 'authGateGoogleFallback'].forEach((id) => {
+      const fallback = document.getElementById(id);
+      if (!fallback) return;
+      const hostId = id === 'authGateGoogleFallback' ? 'authGateGoogleBtn' : 'googleSignInBtn';
+      const host = document.getElementById(hostId);
+      const show = !inGoogle && !gisButtonPresent(host);
+      fallback.hidden = !show;
+    });
+  }
+
+  function syncAuthGate() {
+    const gate = document.getElementById('authGate');
+    const inGoogle = googleSignedIn();
+    if (gate) gate.hidden = inGoogle;
+    document.body.classList.toggle('auth-gated', !inGoogle);
+    if (!inGoogle) {
+      try { closeSheet('roleSheet'); } catch (e) { /* ignore */ }
+      googleBtnRendered = false;
+      /* Unhide first, then GIS renderButton so host width is real on phones. */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => initGoogleSignIn(true));
+      });
+    }
   }
 
   function syncGoogleAuthUi() {
@@ -275,15 +302,19 @@
 
   function initGoogleSignIn(forceRerender) {
     if (googleSignedIn()) return;
-    const host = document.getElementById('googleSignInBtn');
+    const host = activeGoogleHost();
     if (!host) return;
     if (forceRerender) {
       host.innerHTML = '';
+      const other = document.getElementById(host.id === 'authGateGoogleBtn' ? 'googleSignInBtn' : 'authGateGoogleBtn');
+      if (other) other.innerHTML = '';
       googleBtnRendered = false;
       syncGoogleFallback();
     }
     function tryRender() {
       if (!(window.google && google.accounts && google.accounts.id)) return false;
+      const h = activeGoogleHost();
+      if (!h) return false;
       try {
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
@@ -293,10 +324,11 @@
           auto_select: false,
           cancel_on_tap_outside: true
         });
-        if (!googleBtnRendered || forceRerender || !host.querySelector('iframe, div[role="button"]')) {
-          host.innerHTML = '';
-          const w = Math.max(240, Math.min(400, Math.floor(host.getBoundingClientRect().width || host.parentElement && host.parentElement.clientWidth || 320)));
-          google.accounts.id.renderButton(host, {
+        /* Unhide gate first so GIS host width is real (same phone fix as Profile sheet). */
+        if (!googleBtnRendered || forceRerender || !h.querySelector('iframe, div[role="button"]')) {
+          h.innerHTML = '';
+          const w = Math.max(240, Math.min(400, Math.floor(h.getBoundingClientRect().width || h.parentElement && h.parentElement.clientWidth || 320)));
+          google.accounts.id.renderButton(h, {
             type: 'standard',
             theme: 'filled_black',
             size: 'large',
@@ -325,7 +357,7 @@
     const id = localUserId();
     obj.by = id;
     obj.userId = id;
-    obj.byName = displayName() || '';
+    obj.byName = displayName() || googleName() || '';
     obj.byRole = role || '';
     obj.stampedAt = Date.now();
     return obj;
@@ -341,7 +373,7 @@
     return stampCore(obj);
   }
 
-  /* Optional display name. Rename keeps the SAME auto-minted userId. */
+  /* Display name (Google name used when empty). Rename keeps the SAME userId. */
   function displayName() {
     try {
       return (localStorage.getItem('onpad:displayName') || '').trim();
@@ -505,7 +537,7 @@
     const profiles = ensureProfiles();
     profiles[id] = {
       userId: id,
-      name: displayName() || '',
+      name: displayName() || googleName() || '',
       role: role,
       u: now()
     };
@@ -606,7 +638,7 @@
   /* Global API for App Builder (map tap-chip + 30s soft-lock). Settings owns progress UI. */
   window.OnPadAccount = {
     userId: () => localUserId(),
-    profile: () => ({ userId: localUserId(), name: displayName(), role }),
+    profile: () => ({ userId: localUserId(), name: displayName() || googleName() || '', role }),
     stamp: (obj) => stampCore(obj),
     lookup: (userId) => lookupProfile(userId),
     profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
@@ -1326,8 +1358,8 @@
     const tmp = stamp({});
     r.claimedBy = tmp.userId || tmp.by || '';
     r.byClaimed = r.claimedBy;
-    r.claimedByName = tmp.byName || '';
-    r.claimedByRole = tmp.byRole || '';
+    r.claimedByName = (tmp.byName || displayName() || googleName() || '').trim();
+    r.claimedByRole = tmp.byRole || role || '';
     r.claimedAt = tmp.stampedAt || Date.now();
     r.u = now();
     return r;
@@ -1342,7 +1374,11 @@
     claimStampOnto(r);
     persist();
     select({ kind: 'request', id: r.id });
-    const who = (r.claimedByName || '').trim() || truncUserId(r.claimedBy) || 'you';
+    const who = profileLabel({
+      userId: r.claimedBy,
+      byName: r.claimedByName,
+      byRole: r.claimedByRole
+    });
     ui.toast('Claimed · ' + who);
   }
 
@@ -1969,10 +2005,11 @@
         + '</span>';
       meta.innerHTML = orderSvg(r) + metaWithPlacer(title, r);
       if (claimed) {
-        const claimWho = (r.claimedByName || '').trim()
-          || (ROLE_LABEL[r.claimedByRole] || r.claimedByRole || '')
-          || truncUserId(r.claimedBy || r.byClaimed)
-          || 'Claimed';
+        const claimWho = profileLabel({
+          userId: r.claimedBy || r.byClaimed,
+          byName: r.claimedByName,
+          byRole: r.claimedByRole
+        });
         const chip = document.createElement('div');
         chip.className = 'placer-chip claimed-chip';
         chip.textContent = 'Claimed by ' + claimWho;
@@ -2269,6 +2306,9 @@
     if (continueBtn) {
       continueBtn.addEventListener('click', () => {
         if (nameInput) setDisplayName(nameInput.value);
+        if (!displayName() && !googleName()) {
+          ui.toast('Add your name so claims show who you are');
+        }
         markProfileReady();
         publishLocalProfile();
         syncProfileSheet();
@@ -2281,25 +2321,27 @@
     if (googleOut) {
       googleOut.addEventListener('click', () => signOutGoogle());
     }
-    const googleFb = document.getElementById('googleSignInFallback');
-    if (googleFb) {
-      googleFb.addEventListener('click', () => {
-        if (googleSignedIn()) {
-          syncGoogleAuthUi();
-          return;
-        }
-        const gisReady = !!(window.google && google.accounts && google.accounts.id);
-        if (!gisReady) {
-          ui.toast('Loading Google…');
-          initGoogleSignIn(true);
-          return;
-        }
+    function promptGoogleSignIn() {
+      if (googleSignedIn()) {
+        syncGoogleAuthUi();
+        syncAuthGate();
+        return;
+      }
+      const gisReady = !!(window.google && google.accounts && google.accounts.id);
+      if (!gisReady) {
+        ui.toast('Loading Google…');
         initGoogleSignIn(true);
-        try {
-          google.accounts.id.prompt();
-        } catch (e) { /* renderButton is the primary path */ }
-      });
+        return;
+      }
+      initGoogleSignIn(true);
+      try {
+        google.accounts.id.prompt();
+      } catch (e) { /* renderButton is the primary path */ }
     }
+    const googleFb = document.getElementById('googleSignInFallback');
+    if (googleFb) googleFb.addEventListener('click', promptGoogleSignIn);
+    const authGateFb = document.getElementById('authGateGoogleFallback');
+    if (authGateFb) authGateFb.addEventListener('click', promptGoogleSignIn);
     initGoogleSignIn(false);
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
@@ -2377,8 +2419,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v25').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=25')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v26').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=26')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -2404,6 +2446,7 @@
       initMap();
       bind();
       renderAll();
+      syncAuthGate();
       PositionSource.on(onPos);
       PositionSource.startPhoneGps();
       try { connectMqtt(0); } catch (e) { ui.sync('local'); }
