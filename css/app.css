@@ -1165,3 +1165,13 @@ body.truck-open .rail {
 .google-auth .fat {
   text-transform: uppercase;
 }
+
+/* Hide ±GPS accuracy pill — keep LIVE sync badge */
+#gpsBadge { display: none !important; }
+.req-move { background: #3a3228; color: var(--safety); }
+.req-move-dozer { color: #f0c040; }
+.req-move-excavator { color: #e07030; }
+.req-move-water { color: #3a9ad9; }
+.leaflet-div-icon.req-move { background: #3a3228; color: var(--safety); }
+.req-icon.done { opacity: 0.4; }
+.done-chip { color: #b6f08a; font-size: 12px; font-weight: 800; }

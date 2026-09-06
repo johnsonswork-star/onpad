@@ -435,6 +435,11 @@
     if (from.claimedByName != null) onto.claimedByName = from.claimedByName;
     if (from.claimedByRole != null) onto.claimedByRole = from.claimedByRole;
     if (from.claimedAt != null) onto.claimedAt = from.claimedAt;
+    if (from.status != null) onto.status = from.status;
+    if (from.completedBy != null) onto.completedBy = from.completedBy;
+    if (from.completedByName != null) onto.completedByName = from.completedByName;
+    if (from.completedByRole != null) onto.completedByRole = from.completedByRole;
+    if (from.completedAt != null) onto.completedAt = from.completedAt;
     return onto;
   }
   function earlierStamp(a, b) {
@@ -860,15 +865,11 @@
       this._t = setTimeout(() => { el.hidden = true; }, 2200);
     },
     gps(pos) {
+      /* ±accuracy pill hidden — Chris found it confusing next to LIVE */
       const el = document.getElementById('gpsBadge');
-      if (!pos) {
-        el.className = 'badge gps-off';
-        el.textContent = 'GPS';
-        return;
-      }
-      const ft = Math.round(pos.accM * FT_PER_M);
-      el.textContent = '±' + ft + 'ft';
-      el.className = 'badge ' + (pos.accM > 12 ? 'gps-weak' : 'gps-on');
+      if (!el) return;
+      el.hidden = true;
+      el.textContent = '';
     },
     sync(mode) {
       const el = document.getElementById('syncBadge');
@@ -1124,7 +1125,8 @@
       ui.tools();
       return;
     }
-    if (placeTool === 'water-light' || placeTool === 'water-heavy' || placeTool === 'cleanup') {
+    if (placeTool === 'water-light' || placeTool === 'water-heavy' || placeTool === 'cleanup'
+        || placeTool === 'move-dozer' || placeTool === 'move-excavator' || placeTool === 'move-water') {
       placeRequest(placeTool, e.latlng);
       placeTool = null;
       ui.tools();
@@ -1344,11 +1346,65 @@
     ui.toast('Claimed · ' + who);
   }
 
-  function reqIcon(kind, claimed) {
-    const cls = kind === 'cleanup' ? 'req-cleanup' : (kind === 'water-heavy' ? 'req-heavy' : 'req-light');
-    const svg = kind === 'cleanup' ? SVG.blade : (kind === 'water-heavy' ? SVG.drop : SVG.mist);
+  function isOrderDone(r) {
+    return !!(r && (r.status === 'done' || r.completedAt));
+  }
+
+  function completeOrder(r) {
+    /* ✓ = done log — KEEP ghost on map. Never hard-delete. */
+    if (!r || r.gone) return;
+    if (isOrderDone(r)) {
+      ui.toast('Already done — still on map');
+      select({ kind: 'request', id: r.id });
+      return;
+    }
+    const tmp = stamp({});
+    r.status = 'done';
+    r.completedBy = tmp.userId || tmp.by || '';
+    r.completedByName = tmp.byName || '';
+    r.completedByRole = tmp.byRole || '';
+    r.completedAt = tmp.stampedAt || Date.now();
+    r.u = now();
+    /* Ensure ghost look even if never claimed */
+    if (!isOrderClaimed(r)) claimStampOnto(r);
+    persist();
+    select({ kind: 'request', id: r.id });
+    ui.toast('Done — kept on map');
+  }
+
+  function orderLabel(r) {
+    if (!r) return 'ORDER';
+    if (r.kind === 'cleanup') return 'CLEAN';
+    if (r.kind === 'water-heavy') return 'HEAVY';
+    if (r.kind === 'water-light') return 'LIGHT';
+    if (r.kind === 'move-dozer') return 'MOVE DOZER';
+    if (r.kind === 'move-excavator') return 'MOVE EXCV';
+    if (r.kind === 'move-water') return 'MOVE WATER';
+    return String(r.kind || 'ORDER').toUpperCase();
+  }
+
+  function orderSvg(r) {
+    if (!r) return SVG.drop;
+    if (r.kind === 'cleanup') return SVG.blade;
+    if (r.kind === 'move-dozer') return SVG.dozer;
+    if (r.kind === 'move-excavator') return SVG.excavator;
+    if (r.kind === 'move-water') return SVG.water;
+    if (r.kind === 'water-heavy') return SVG.drop;
+    return SVG.mist;
+  }
+
+  function reqIcon(kind, claimed, done) {
+    let cls = 'req-light';
+    let svg = SVG.mist;
+    if (kind === 'cleanup') { cls = 'req-cleanup'; svg = SVG.blade; }
+    else if (kind === 'water-heavy') { cls = 'req-heavy'; svg = SVG.drop; }
+    else if (kind === 'water-light') { cls = 'req-light'; svg = SVG.mist; }
+    else if (kind === 'move-dozer') { cls = 'req-move req-move-dozer'; svg = SVG.dozer; }
+    else if (kind === 'move-excavator') { cls = 'req-move req-move-excavator'; svg = SVG.excavator; }
+    else if (kind === 'move-water') { cls = 'req-move req-move-water'; svg = SVG.water; }
+    const ghost = claimed || done;
     return L.divIcon({
-      className: 'req-icon ' + cls + (claimed ? ' claimed' : ''),
+      className: 'req-icon ' + cls + (ghost ? ' claimed' : '') + (done ? ' done' : ''),
       html: svg,
       iconSize: [28, 28],
       iconAnchor: [14, 14]
@@ -1362,10 +1418,11 @@
       if (r.gone) return;
       const locked = isSoftLocked(r);
       const claimed = isOrderClaimed(r);
+      const done = isOrderDone(r);
       const m = L.marker([r.lat, r.lng], {
-        icon: reqIcon(r.kind, claimed),
-        draggable: !locked,
-        zIndexOffset: claimed ? 380 : 400
+        icon: reqIcon(r.kind, claimed, done),
+        draggable: !locked && !done,
+        zIndexOffset: (claimed || done) ? 380 : 400
       });
       m.addTo(layers.requests);
       m.on('click', (e) => {
@@ -1765,17 +1822,19 @@
   /* fleet — manually placed machine markers (not GPS "me") */
   function placeFleet(kind, latlng) {
     if (!state.fleet) state.fleet = [];
+    const name = ROLE_LABEL[kind] || kind;
     const item = stamp({
       id: uid(),
       role: kind,
+      name: name, /* simple temp machine profile — just the machine name */
       lat: latlng.lat,
       lng: latlng.lng,
       u: now()
     });
     state.fleet.push(item);
     persist();
-    select(null);
-    ui.toast((ROLE_LABEL[kind] || kind) + ' placed');
+    select({ kind: 'fleet', id: item.id });
+    ui.toast(name + ' last-known set — drag to move');
   }
 
   function fleetIcon(r, on) {
@@ -1795,18 +1854,14 @@
     (state.fleet || []).forEach((f) => {
       if (f.gone || f.lat == null) return;
       const on = selected && selected.kind === 'fleet' && selected.id === f.id;
-      const locked = isSoftLocked(f);
+      /* Last-known stays until moved — always allow drag to update location */
       const m = L.marker([f.lat, f.lng], {
         icon: fleetIcon(f.role, on),
         zIndexOffset: 700,
-        draggable: !locked
+        draggable: true
       }).addTo(layers.fleet);
       m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
-      if (locked) {
-        m.on('dragstart', (e) => { L.DomEvent.stop(e); softLockToast(); });
-      } else {
-        wirePixelDrag(m, () => state.fleet, f.id);
-      }
+      wirePixelDrag(m, () => state.fleet, f.id);
     });
   }
 
@@ -1907,10 +1962,12 @@
     } else if (sel.kind === 'request') {
       const r = findById(state.requests, sel.id);
       if (!r) { bar.hidden = true; return; }
-      const label = r.kind === 'cleanup' ? 'CLEAN' : (r.kind === 'water-heavy' ? 'HEAVY' : 'LIGHT');
       const claimed = isOrderClaimed(r);
-      let title = '<span>' + label + (claimed ? ' · CLAIMED' : '') + '</span>';
-      meta.innerHTML = (r.kind === 'cleanup' ? SVG.blade : SVG.drop) + metaWithPlacer(title, r);
+      const done = isOrderDone(r);
+      let title = '<span>' + orderLabel(r)
+        + (done ? ' · DONE' : (claimed ? ' · CLAIMED' : ''))
+        + '</span>';
+      meta.innerHTML = orderSvg(r) + metaWithPlacer(title, r);
       if (claimed) {
         const claimWho = (r.claimedByName || '').trim()
           || (ROLE_LABEL[r.claimedByRole] || r.claimedByRole || '')
@@ -1920,11 +1977,24 @@
         chip.className = 'placer-chip claimed-chip';
         chip.textContent = 'Claimed by ' + claimWho;
         meta.appendChild(chip);
-      } else {
-        /* Claim stays available even after 30s soft-lock — separate from edit lock */
+      }
+      if (done) {
+        const doneWho = (r.completedByName || '').trim()
+          || (ROLE_LABEL[r.completedByRole] || r.completedByRole || '')
+          || truncUserId(r.completedBy)
+          || 'Done';
+        const chip = document.createElement('div');
+        chip.className = 'placer-chip done-chip';
+        chip.textContent = 'Completed by ' + doneWho;
+        meta.appendChild(chip);
+      } else if (!claimed) {
+        /* Claim stays available even after 30s soft-lock */
         acts.appendChild(actBtn('CLAIM', 'claim', () => claimOrder(r)));
       }
-      acts.appendChild(actBtn('✓', 'ok', () => removeItem(state.requests, r)));
+      if (!done) {
+        /* ✓ = complete & KEEP ghost history — never delete */
+        acts.appendChild(actBtn('✓', 'ok', () => completeOrder(r)));
+      }
       appendKillOrLock(acts, r, () => removeItem(state.requests, r));
     } else if (sel.kind === 'dig') {
       const d = findById(state.digPads, sel.id);
@@ -1940,8 +2010,9 @@
     } else if (sel.kind === 'fleet') {
       const f = findById(state.fleet || [], sel.id);
       if (!f) { bar.hidden = true; return; }
+      const machineName = (f.name || ROLE_LABEL[f.role] || f.role || 'Machine').toUpperCase();
       meta.innerHTML = roleSvg(f.role) +
-        metaWithPlacer('<span>' + (ROLE_LABEL[f.role] || f.role).toUpperCase() + '</span>', f);
+        metaWithPlacer('<span>' + machineName + ' · LAST KNOWN</span>', f);
       appendKillOrLock(acts, f, () => removeItem(state.fleet, f));
     } else if (sel.kind === 'path') {
       const p = findById(state.paths || [], sel.id);
@@ -2128,6 +2199,9 @@
             'water-light': 'Tap map for light spray',
             'water-heavy': 'Tap map for heavy water',
             cleanup: 'Tap map for cleanup',
+            'move-dozer': 'Tap map — request dozer here',
+            'move-excavator': 'Tap map — request excavator here',
+            'move-water': 'Tap map — request water truck here',
             'path-draw': 'Tap map to drop haul points',
             'path-point': 'Tap map to drop a point'
           };
@@ -2303,8 +2377,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v24').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=24')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v25').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=25')).catch(() => {});
   }
 
   function showBootError(msg) {

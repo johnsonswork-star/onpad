@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=24" />
+  <link rel="stylesheet" href="css/app.css?v=25" />
 </head>
 <body>
   <div id="app">
@@ -75,6 +75,22 @@
               <path d="M10 28l4-12h20l4 12" fill="none" stroke="currentColor" stroke-width="4"/>
             </svg>
             <span>Clean</span>
+          </button>
+        </div>
+
+        <div class="rail-section" id="moveRow" aria-label="Move equipment">
+          <span class="rail-label">Move</span>
+          <button type="button" class="tool tool-machine" data-tool="move-dozer" aria-label="Request dozer here">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="16" width="28" height="12" rx="2" fill="currentColor"/><rect x="4" y="24" width="14" height="6" fill="currentColor"/><circle cx="16" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="34" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Dozer</span>
+          </button>
+          <button type="button" class="tool tool-machine" data-tool="move-excavator" aria-label="Request excavator here">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="18" width="20" height="10" rx="2" fill="currentColor"/><path d="M30 20l14-8-3 10-8 4" fill="currentColor"/><circle cx="18" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="36" r="4" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Excv</span>
+          </button>
+          <button type="button" class="tool tool-machine" data-tool="move-water" aria-label="Request water truck here">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="16" width="14" height="10" rx="2" fill="currentColor"/><ellipse cx="30" cy="22" rx="12" ry="8" fill="currentColor"/><circle cx="12" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="36" r="5" fill="#1c1814" stroke="currentColor" stroke-width="3"/></svg>
+            <span>Water</span>
           </button>
         </div>
         <div class="rail-section" id="stakeRow" aria-label="Stakeout">
@@ -275,6 +291,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=24"></script>
+  <script src="js/app.js?v=25"></script>
 </body>
 </html>
