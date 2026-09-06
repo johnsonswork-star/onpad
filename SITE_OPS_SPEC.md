@@ -201,7 +201,7 @@ Flag on an object (orders, machines, paths, etc.) enters moderation.
 - L3+ non-mods review cards only. Mods may auto-decide outside the queue.
 - Profile owns: L3 gate helpers, punishment record / restriction history API.
 - App Builder owns: map Flag entry, queue card UI, `myIsMod()` auto-decide wiring.
-- Fold full swipe UI into **P2/P4** after clock-in P1 (`?v=36`). Bump `?v=` as needed; coordinate with Profile (`?v=37+`).
+- Fold full swipe UI into **P2/P4** after clock-in P1 (`?v=36`). Bump `?v=` as needed; coordinate with Profile (`?v=39`); next map after that `?v=40+`.
 
 ### Cancelled / removed
 
@@ -364,9 +364,9 @@ Mod bar:
 
 | Phase | Owner | Notes |
 |-------|-------|-------|
-| P1 Clock-in / park / end | App Builder | Shipped `?v=36` |
+| P1 Clock-in / park / end | App Builder | Shipped `?v=36`; report rule on `?v=38` |
 | P2 Object sheet tap targets | App Builder | Machine→object sheet; name→profile |
-| P3 Scores ▲▼ | Profile helpers + map display | Likely `?v=37+` |
-| P4 Mod stealth + L3 swipe report queue | Map UI Builder; L3 gate + punishment record Profile | After P1; bump `?v=` as needed |
+| P3 Scores ▲▼ | Profile helpers + map display | Profile tip `?v=39` |
+| P4 Mod stealth + L3 swipe report queue | Map UI Builder; L3 gate + punishment record Profile | After Profile `?v=39`; map `?v=40+` |
 | P5 Send to Grok Bot | — | **CANCELLED** |
 
