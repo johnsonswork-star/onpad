@@ -1096,6 +1096,8 @@
     }
     if (placeTool === 'water-light' || placeTool === 'water-heavy' || placeTool === 'cleanup') {
       placeRequest(placeTool, e.latlng);
+      placeTool = null;
+      ui.tools();
       return;
     }
     if (placeTool === 'place-dozer' || placeTool === 'place-excavator' || placeTool === 'place-water') {
@@ -1269,14 +1271,18 @@
 
   /* requests */
   function placeRequest(kind, latlng) {
-    state.requests.push(stamp({
+    const item = stamp({
       id: uid(),
       kind,
       lat: latlng.lat,
       lng: latlng.lng,
       u: now()
-    }));
+    });
+    state.requests.push(item);
     persist();
+    /* Show selection bar with CLAIM right away */
+    select({ kind: 'request', id: item.id });
+    ui.toast('Order placed — tap CLAIM or tap it again to claim');
   }
 
   function isOrderClaimed(r) {
@@ -1332,7 +1338,15 @@
         zIndexOffset: claimed ? 380 : 400
       });
       m.addTo(layers.requests);
-      m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'request', id: r.id }); });
+      m.on('click', (e) => {
+        L.DomEvent.stop(e);
+        /* Second tap on an already-selected unclaimed order = claim */
+        if (selected && selected.kind === 'request' && selected.id === r.id && !isOrderClaimed(r)) {
+          claimOrder(r);
+          return;
+        }
+        select({ kind: 'request', id: r.id });
+      });
       if (locked) {
         m.on('dragstart', (e) => { L.DomEvent.stop(e); softLockToast(); });
       } else {
@@ -2240,8 +2254,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v21').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=21')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v22').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=22')).catch(() => {});
   }
 
   function showBootError(msg) {
