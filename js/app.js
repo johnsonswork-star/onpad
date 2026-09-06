@@ -930,13 +930,9 @@
     } catch (e) {}
     return stubLevel(userId);
   }
-  function canAutoDeleteReport(reporterId) {
-    try {
-      if (window.OnPadAccount && typeof window.OnPadAccount.canAutoDeleteReport === 'function') {
-        return !!window.OnPadAccount.canAutoDeleteReport(reporterId || currentUserId());
-      }
-    } catch (e) {}
-    return userLevel(reporterId || currentUserId()) >= 3;
+  /* Auto-decide reports: mods only (Chris 2026-09-06). L3+ review the queue; no L3 auto-remove. */
+  function canAutoDecideReport() {
+    return !!myIsMod();
   }
   function isBoardVoter(userId) {
     try {
@@ -1069,13 +1065,13 @@
     }
     reports.push({ by: me, at: Date.now() });
     item.u = now();
-    if (canAutoDeleteReport(me)) {
-      ui.toast('Report accepted — removed (L3+)');
+    if (canAutoDecideReport()) {
+      ui.toast('Report accepted — removed (mod)');
       forceRemove(arr, item);
       return;
     }
     persist();
-    ui.toast('Reported — review board (need 3 votes)');
+    ui.toast('Reported — L3+ review queue');
     select(selected);
   }
   function castModVote(arr, item, vote) {
@@ -1892,7 +1888,7 @@
     myLevel: () => accountLevel(localUserId()),
     getLevel: () => accountLevel(localUserId()),
     recordLike: (featureId, targetUserId) => accountRecordLike(featureId, targetUserId),
-    canAutoDeleteReport: (reporterId) => accountLevel(reporterId || localUserId()) >= 3,
+    canAutoDecideReport: () => !!myIsMod(),
     isBoardVoter: (userId) => googleSignedIn() || !!(userId && String(userId)),
     isFounder: (userId) => isFounder(userId),
     isMod: (userId) => isMod(userId),
@@ -3886,8 +3882,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v36').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=36')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v38').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=38')).catch(() => {});
   }
 
   function showBootError(msg) {

@@ -1,7 +1,7 @@
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 
-Last updated: 2026-09-06 (moderation: L3 swipe queue; Send-to-Grok cancelled)
+Last updated: 2026-09-06 (all reports→L3 queue; mod-only auto-decide; Send-to-Grok cancelled)
 
 ---
 
@@ -14,7 +14,7 @@ A live job-site map where:
 - Likes and dislikes define the person.
 - Object taps rate the object. Name taps open profile.
 - Mods look like normal players until they turn tools on.
-- Flag / report: L3+ auto-removes; below L3 goes to an L3+ swipe review queue with Site Ops punishments.
+- Flag / report: all reports → L3+ swipe review queue; only mods auto-decide (instant remove/punish).
 
 ---
 
@@ -175,28 +175,34 @@ Then bio, hours, machines, notes.
 
 Flag on an object (orders, machines, paths, etc.) enters moderation.
 
-### Reporter level
+**Chris override 2026-09-06:** L3+ no longer auto-removes. All reports go to the queue unless a **mod** auto-decides.
 
-| Reporter | Immediate effect |
-|----------|------------------|
-| **L3+** (5,000+ likes received) | Auto-remove the reported object (same as today’s L3 auto-delete). Leave as auto-remove unless Cos says otherwise. |
-| **Below L3** | Object stays up; report enters the **L3+ review queue** (not a public board). |
+### Who reports
+
+| Actor | Immediate effect |
+|-------|------------------|
+| **Anyone** (any level) | Object stays up; report enters the **L3+ Tinder-style review queue**. |
+| **Mod** (`myIsMod()`) | May **auto-decide** — instant remove and/or punish without the queue (mod tools / Flag as mod). |
+
+Do **not** use reporter L3 / `canAutoDeleteReport` for auto-remove. Drop that path. Auto-decide = `myIsMod()` only.
 
 ### Review queue (L3+ only)
 
-- Accessible only to users at **L3+** (and founders/mods if Profile gates that way — Profile owns the L3 gate).
+- Accessible only to users at **L3+**. Profile owns the L3 gate.
 - **Tinder-style / swipe card UI** — one report at a time. Not KEEP/DROP vote counters alone.
 - Card shows: reported object preview, reporter, reason/context, owner.
 - Reviewer actions:
   - **Agree (violation)** → choose a **punishment** from Site Ops §10 (Warn / Mute / Tool restrict / Movement restrict / Kick / Temp ban / Ban). Apply + log on the player’s public restriction record. Object may also be removed.
-  - **Disagree** → dismiss the report (clear from queue; object stays unless separately removed).
+  - **Disagree / Dismiss** → clear from queue; object stays unless separately removed.
+- Mods can still auto-decide outside the queue; L3+ non-mods review cards only.
 - Profile owns: L3 gate helpers, punishment record / restriction history API.
-- App Builder owns: map Flag entry, queue card UI on the map app, wiring to Profile helpers.
-- Fold implementation into **P2/P4** after clock-in P1 (`?v=36`). Bump `?v=` as needed; coordinate cache with Profile (`?v=37+` scores/mod overlays).
+- App Builder owns: map Flag entry, queue card UI, `myIsMod()` auto-decide wiring.
+- Fold full swipe UI into **P2/P4** after clock-in P1 (`?v=36`). Bump `?v=` as needed; coordinate with Profile (`?v=37+`).
 
 ### Deprecated
 
-- Old multi-vote KEEP/DROP review board is superseded by the swipe queue for below-L3 reports.
+- L3+ reporter auto-remove / `canAutoDeleteReport` — **removed**.
+- Old multi-vote KEEP/DROP review board — superseded by the swipe queue.
 - **`Send selected to Grok Bot` / Cos handoff is CANCELLED** — dropped for now. Do not implement.
 
 ---
@@ -255,7 +261,8 @@ While on:
 
 - Player rows and profiles gain: Warn, Mute, Tool restrict, Movement restrict, Kick, Temp ban, Ban
 - Object sheets gain: restrict owner, remove object
-- L3+ also get the **report review queue** (swipe cards) even if tools are off — queue is level-gated, not only mod-tools-gated
+- L3+ get the **report review queue** (swipe cards) even if tools are off — queue is level-gated
+- Mods (`myIsMod`) may auto-decide (remove/punish) without the queue
 - Thin private chip only the mod sees: `Tools on`
 
 Restrictions write to the player’s public record. The buttons that apply them stay behind the click.
@@ -324,7 +331,7 @@ Mod bar:
 - Ending shift always parks first, then unpublishes location.
 - Parked machines keep owner ID so likes still attach to the person.
 - Score on owner updates even if the machine is parked and the owner is off-map.
-- Report: L3+ reporter → auto-remove; below L3 → L3+ swipe queue (Agree→punishment / Dismiss).
+- Report: every Flag → L3+ swipe queue; auto-decide only if `myIsMod()` (no L3 `canAutoDeleteReport`).
 - Punishments write to the player’s public restriction record (Profile API).
 - Do **not** implement Send-to-Grok / Cos handoff (cancelled).
 - Mod tools default off on launch (shared screen / locked phone).
@@ -343,8 +350,9 @@ Mod bar:
 - Score visible on pin, list, sheet, and profile header.
 - Like/dislike updates object + owner + history.
 - Mod looks normal until `Mod tools` is tapped.
-- Below-L3 Flag enters L3+ swipe review queue; L3+ Flag auto-removes.
+- Every Flag enters L3+ swipe review queue unless a mod auto-decides.
 - Agree on a queue card requires a §10 punishment; Dismiss clears the report.
+- L3+ non-mods never auto-remove from Flag alone.
 - No Send-to-Grok action.
 
 ---
