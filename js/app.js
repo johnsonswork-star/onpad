@@ -704,12 +704,22 @@
   function metaWithPlacer(titleHtml, item) {
     const who = placerLabel(item);
     const uid = item ? (item.userId || item.by || '') : '';
+    const likeN = likeDisplayCount(item);
+    const disN = (item && item.dislikes) ? item.dislikes.length : 0;
+    const objScore = '<div class="object-score">' + likeN + ' likes · ' + disN + ' dislike' + (disN === 1 ? '' : 's') + '</div>';
+    let ownerScore = '';
+    if (uid) {
+      try {
+        const lab = accountScoreFormat(uid);
+        if (lab) ownerScore = '<div class="owner-score">' + escHtml(who || 'Owner') + '  ' + escHtml(lab) + '</div>';
+      } catch (e) {}
+    }
     const placer = who
       ? ('<button type="button" class="selected-placer placer-link" data-user-id="' +
          escHtml(uid) + '" title="View profile">' + escHtml(who) + '</button>')
       : '';
     return '<div class="selected-meta-text"><div class="selected-title">' + titleHtml +
-      '</div>' + placer + '</div>';
+      '</div>' + objScore + placer + ownerScore + '</div>';
   }
 
   function openUserProfile(userId) {
@@ -1091,6 +1101,7 @@
     try { enqueueReport(item.id, me); } catch (e) {}
     persist();
     ui.toast('Reported — L3+ review queue');
+    try { syncReportQueueUi(); } catch (e) {}
     select(selected);
   }
   function castModVote(arr, item, vote) {
@@ -1139,31 +1150,26 @@
     const liked = me && voteIndex(likes, me) >= 0;
     const disliked = me && voteIndex(dislikes, me) >= 0;
     const likeN = likeDisplayCount(item);
-    const likeB = actBtn('👍' + (likeN ? ' ' + likeN : ''), liked ? 'social on' : 'social', () => {
+    const likeB = actBtn('Like' + (likeN ? ' ' + likeN : ''), liked ? 'social on' : 'social', () => {
       toggleLike(item);
       select(selected);
     });
-    const disB = actBtn('👎' + (dislikes.length ? ' ' + dislikes.length : ''), disliked ? 'social on' : 'social', () => {
+    const disB = actBtn('Dislike' + (dislikes.length ? ' ' + dislikes.length : ''), disliked ? 'social on' : 'social', () => {
       toggleDislike(item);
       select(selected);
     });
-    const repB = actBtn('⚑' + (reports.length ? ' ' + reports.length : ''), 'social report', () => reportItem(arr, item));
+    const repB = actBtn('Flag' + (reports.length ? ' ' + reports.length : ''), 'social report', () => reportItem(arr, item));
     acts.appendChild(likeB);
     acts.appendChild(disB);
     acts.appendChild(repB);
+    /* +LIKES only behind Mod tools — not on the primary object row */
     if (myIsMod() && modToolsOn()) {
       acts.appendChild(actBtn('+LIKES', 'social grant', () => {
         modGrantLikes(item);
         select(selected);
       }));
     }
-    if (reports.length) {
-      const votes = item.modVotes || [];
-      const delN = votes.filter((v) => v.vote === 'delete').length;
-      const keepN = votes.filter((v) => v.vote === 'keep').length;
-      acts.appendChild(actBtn('KEEP ' + keepN, 'mod keep', () => castModVote(arr, item, 'keep')));
-      acts.appendChild(actBtn('DROP ' + delN, 'mod drop', () => castModVote(arr, item, 'delete')));
-    }
+    /* KEEP/DROP board removed — L3+ swipe queue (P4) */
   }
   function preserveStamp(from, onto) {
     if (!from) return onto;
@@ -1824,7 +1830,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=39: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=40: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -2009,6 +2015,90 @@
     const pending = listPendingReports();
     return pending.length ? pending[0] : null;
   }
+
+  /* ---- P4: L3+ Tinder-style report queue UI ---- */
+  let reportQueueMode = 'card'; /* card | punish */
+  function syncReportQueueUi() {
+    const btn = document.getElementById('reportQueueBtn');
+    if (!btn) return;
+    const can = canOpenReportQueue();
+    const n = can ? listPendingReports().length : 0;
+    btn.hidden = !(can && n > 0);
+    btn.textContent = n > 1 ? ('Review ' + n + ' reports') : (n === 1 ? 'Review report' : 'Review reports');
+  }
+  function openReportQueueSheet() {
+    if (!canOpenReportQueue()) {
+      ui.toast('L3+ only');
+      return;
+    }
+    const sheet = document.getElementById('reportQueueSheet');
+    if (!sheet) return;
+    reportQueueMode = 'card';
+    sheet.hidden = false;
+    renderReportQueueCard();
+  }
+  function closeReportQueueSheet() {
+    const sheet = document.getElementById('reportQueueSheet');
+    if (sheet) sheet.hidden = true;
+    const punish = document.getElementById('reportPunishRow');
+    if (punish) { punish.hidden = true; punish.innerHTML = ''; }
+    reportQueueMode = 'card';
+    syncReportQueueUi();
+  }
+  function renderReportQueueCard() {
+    const title = document.getElementById('reportQueueTitle');
+    const meta = document.getElementById('reportQueueMeta');
+    const punish = document.getElementById('reportPunishRow');
+    const agree = document.getElementById('reportAgreeBtn');
+    const dismiss = document.getElementById('reportDismissBtn');
+    const row = nextPendingReport();
+    if (punish) { punish.hidden = true; punish.innerHTML = ''; }
+    reportQueueMode = 'card';
+    if (!row) {
+      if (title) title.textContent = 'Queue clear';
+      if (meta) meta.textContent = 'No pending reports';
+      if (agree) agree.hidden = true;
+      if (dismiss) dismiss.hidden = true;
+      syncReportQueueUi();
+      return;
+    }
+    if (agree) agree.hidden = false;
+    if (dismiss) dismiss.hidden = false;
+    if (title) title.textContent = row.title || 'Reported object';
+    const owner = row.ownerId ? (profileLabel(row.ownerId) || truncUserId(row.ownerId)) : 'unknown';
+    const reporter = row.by ? (profileLabel(row.by) || truncUserId(row.by)) : 'unknown';
+    if (meta) meta.textContent = 'Owner · ' + owner + '  ·  Reporter · ' + reporter;
+  }
+  function showReportPunishPicker() {
+    const row = nextPendingReport();
+    if (!row) { renderReportQueueCard(); return; }
+    const punish = document.getElementById('reportPunishRow');
+    if (!punish) return;
+    reportQueueMode = 'punish';
+    punish.hidden = false;
+    punish.innerHTML = '';
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Pick a punishment';
+    punish.appendChild(hint);
+    Object.keys(RESTRICT_ACTIONS).forEach((key) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'report-punish-chip';
+      b.textContent = RESTRICT_ACTIONS[key];
+      b.setAttribute('data-restrict', key);
+      b.addEventListener('click', () => {
+        const ok = agreeReport(row.id, key, '__queue__');
+        if (ok) {
+          ui.toast('Agreed · ' + RESTRICT_ACTIONS[key]);
+          renderReportQueueCard();
+          if (!nextPendingReport()) closeReportQueueSheet();
+        }
+      });
+      punish.appendChild(b);
+    });
+  }
+
   function findReport(reportId) {
     const id = String(reportId || '').trim();
     return ensureReportQueue().find((r) => r && r.id === id) || null;
@@ -2025,6 +2115,7 @@
     row.resolvedAt = Date.now();
     persist();
     try { ui.toast('Report dismissed'); } catch (e) {}
+    try { syncReportQueueUi(); } catch (e2) {}
     return true;
   }
   function agreeReport(reportId, action, reason) {
@@ -2063,8 +2154,19 @@
     row.resolvedBy = localUserId() || '';
     row.resolvedAt = Date.now();
     row.restriction = act;
+    /* Agree may also remove the reported object from the map */
+    try {
+      const feat = findFeatureById(row.featureId);
+      if (feat) {
+        feat._forceRemove = true;
+        feat.gone = true;
+        feat.u = now();
+      }
+    } catch (e2) {}
     persist();
     try { syncRestrictionHistoryUi(); } catch (e) {}
+    try { syncReportQueueUi(); } catch (e3) {}
+    try { renderAll(); } catch (e4) {}
     try { ui.toast('Violation · ' + RESTRICT_ACTIONS[act]); } catch (e) {}
     return true;
   }
@@ -2913,7 +3015,7 @@
     });
     map.on('zoomend', () => { try { pushNearbyUsers(); } catch (e) {} });
 
-    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet', 'reportQueueSheet'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -3720,9 +3822,8 @@
       }).addTo(layers.fleet);
       m.on('click', (e) => {
         L.DomEvent.stop(e);
+        /* P2: object tap → sheet (Like/Dislike/Flag); name chip → profile */
         select({ kind: 'fleet', id: f.id });
-        const uid = f.userId || f.by || '';
-        if (uid) openUserProfile(uid);
       });
       wirePixelDrag(m, () => state.fleet, f.id);
     });
@@ -3985,6 +4086,7 @@
     if (selected) select(selected);
     else document.getElementById('selectedBar').hidden = true;
     try { pushNearbyUsers(); } catch (e) {}
+    try { syncReportQueueUi(); } catch (e2) {}
   }
 
   /* events */
@@ -4101,6 +4203,26 @@
         showNearbySheet();
       });
     }
+    const reportQueueBtn = document.getElementById('reportQueueBtn');
+    if (reportQueueBtn) {
+      reportQueueBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openReportQueueSheet();
+      });
+    }
+    const reportAgreeBtn = document.getElementById('reportAgreeBtn');
+    if (reportAgreeBtn) reportAgreeBtn.addEventListener('click', () => showReportPunishPicker());
+    const reportDismissBtn = document.getElementById('reportDismissBtn');
+    if (reportDismissBtn) reportDismissBtn.addEventListener('click', () => {
+      const row = nextPendingReport();
+      if (!row) { renderReportQueueCard(); return; }
+      dismissReport(row.id);
+      renderReportQueueCard();
+      if (!nextPendingReport()) closeReportQueueSheet();
+    });
+    const reportCloseBtn = document.getElementById('reportQueueCloseBtn');
+    if (reportCloseBtn) reportCloseBtn.addEventListener('click', () => closeReportQueueSheet());
     const truckHandle = document.getElementById('truckBarHandle');
     if (truckHandle) truckHandle.addEventListener('click', () => openTruckBar());
     const pathStart = document.getElementById('pathStartBtn');
@@ -4403,8 +4525,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v39').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=39')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v40').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=40')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -4434,6 +4556,7 @@
       bind();
       renderAll();
       syncAuthGate();
+      try { syncReportQueueUi(); } catch (eRq) {}
       PositionSource.on(onPos);
       PositionSource.startPhoneGps();
       try { connectMqtt(0); } catch (e) { ui.sync('local'); }

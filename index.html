@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=39" />
+  <link rel="stylesheet" href="css/app.css?v=40" />
 </head>
 <body>
   <div id="app">
@@ -37,6 +37,7 @@
         <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
         <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
         <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view">NEARBY</button>
+        <button type="button" id="reportQueueBtn" class="badge report-queue-btn" hidden title="L3+ report review queue">REPORTS</button>
         <span id="modToolsChip" class="badge mod-tools-chip" hidden title="Mod tools active for this session">Tools on</span>
       </div>
     </header>
@@ -229,6 +230,22 @@
   </div>
 
 
+  <!-- P4 L3+ Tinder-style report review queue -->
+  <div id="reportQueueSheet" class="sheet report-queue-sheet" hidden>
+    <div class="sheet-card report-queue-card">
+      <h2>Report review</h2>
+      <p id="reportQueueHint" class="hint">L3+ only — one card at a time</p>
+      <div id="reportQueueTitle" class="report-q-title">—</div>
+      <p id="reportQueueMeta" class="report-q-meta">—</p>
+      <div id="reportPunishRow" class="report-punish-row" hidden></div>
+      <div class="sheet-actions report-q-actions">
+        <button type="button" id="reportAgreeBtn" class="fat primary">Agree</button>
+        <button type="button" id="reportDismissBtn" class="fat">Dismiss</button>
+        <button type="button" id="reportQueueCloseBtn" class="fat">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Clock-in — everyone; pedestrian until Start shift -->
   <div id="clockInSheet" class="sheet clock-in-sheet" hidden>
     <div class="sheet-card">
@@ -391,6 +408,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=39"></script>
+  <script src="js/app.js?v=40"></script>
 </body>
 </html>

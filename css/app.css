@@ -1666,3 +1666,51 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
   font-weight: 700;
   color: #e0c8b0;
 }
+
+/* P2 object sheet scores + P4 report queue (?v=40) */
+.object-score, .owner-score {
+  font-size: 12px;
+  font-weight: 800;
+  color: #f5d547;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.owner-score { color: #e8d090; }
+.report-queue-btn {
+  background: #3a2018 !important;
+  border-color: #8a4030 !important;
+  color: #ffc8a0 !important;
+}
+.report-queue-sheet { z-index: 2700; }
+.report-queue-card .report-q-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #f5d547;
+  margin: 8px 0 4px;
+}
+.report-q-meta {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8b880;
+  margin: 0 0 12px;
+}
+.report-punish-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.report-punish-chip {
+  flex: 1 1 40%;
+  min-width: 120px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 2px solid #5a4a30;
+  background: #2a241c;
+  color: #f5d547;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+}
+.report-punish-chip:active { background: #3a3220; }
+.report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
