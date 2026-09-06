@@ -13,12 +13,17 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=35" />
+  <link rel="stylesheet" href="css/app.css?v=36" />
 </head>
 <body>
   <div id="app">
     <div id="map" role="application" aria-label="Jobsite satellite map"></div>
 
+    <div id="shiftBar" class="shift-bar" hidden>
+      <button type="button" id="parkMachineBtn" class="shift-act">Park machine</button>
+      <button type="button" id="switchRoleBtn" class="shift-act">Switch role</button>
+      <button type="button" id="endShiftBtn" class="shift-act danger">End shift</button>
+    </div>
     <header id="topbar">
       <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Profile and role">
         <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
@@ -222,6 +227,20 @@
     </div>
   </div>
 
+
+  <!-- Clock-in — everyone; pedestrian until Start shift -->
+  <div id="clockInSheet" class="sheet clock-in-sheet" hidden>
+    <div class="sheet-card">
+      <h2 id="clockInTitle">Pick your role</h2>
+      <p class="hint">Clock in to go live on the map. Until then you are a pedestrian (view-only).</p>
+      <div id="clockInRoles" class="clock-in-roles" role="listbox" aria-label="Shift roles"></div>
+      <div class="sheet-actions">
+        <button type="button" id="startShiftBtn" class="fat primary">Start shift</button>
+        <button type="button" id="clockInCancelBtn" class="fat" hidden>Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Profile sheet — same entry as role (#roleBtn). No second nav. -->
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
@@ -337,6 +356,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=35"></script>
+  <script src="js/app.js?v=36"></script>
 </body>
 </html>

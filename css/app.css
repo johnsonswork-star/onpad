@@ -1468,3 +1468,80 @@ button.placer-chip {
   text-shadow: 0 1px 2px #000;
   pointer-events: none;
 }
+
+/* P1 clock-in / shift bar (?v=36) */
+.clock-in-sheet { z-index: 2600; }
+.clock-in-roles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+.clock-role-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 2px solid #5a4a30;
+  background: #2a241c;
+  color: #f5d547;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+}
+.clock-role-chip.active {
+  border-color: #f5d547;
+  background: #3a3220;
+  box-shadow: 0 0 0 2px #f5d54755;
+}
+.clock-role-glyph {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  color: #f5d547;
+}
+.clock-role-glyph svg { width: 32px; height: 32px; }
+.clock-role-glyph .role-letter {
+  font-size: 16px; font-weight: 900; color: #f5d547;
+}
+.clock-in-sheet.switch-only #clockInCancelBtn { display: inline-flex !important; }
+.shift-bar {
+  position: fixed;
+  left: 8px; right: 8px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 2200;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+.shift-act {
+  pointer-events: auto;
+  flex: 1 1 30%;
+  min-width: 100px;
+  max-width: 160px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 2px solid #5a4a30;
+  background: #1c1814ee;
+  color: #f5d547;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.shift-act.danger {
+  border-color: #8a3030;
+  color: #ffb0a8;
+  background: #3a1818ee;
+}
+body.shift-gated .rail,
+body.shift-gated #truckBar,
+body.shift-gated .tool {
+  opacity: 0.45;
+  pointer-events: none;
+}
+body.shift-gated #shiftBar { display: none !important; }
+body.on-shift #shiftBar:not([hidden]) { display: flex; }

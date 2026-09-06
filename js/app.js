@@ -16,17 +16,23 @@
     road: { w: 8, l: 50, rot: 90 },
     pile: { r: 8 }
   };
-  const MACHINE_ROLES = ['dozer', 'excavator', 'water'];
-  const CREW_ROLES = ['survey', 'foreman', 'geology', 'mechanic', 'trucker', 'laborer', 'fuel'];
+  const MACHINE_ROLES = ['dozer', 'excavator', 'water', 'haul'];
+  const CREW_ROLES = ['spotter', 'qa', 'survey', 'foreman', 'geology', 'mechanic', 'trucker', 'laborer', 'fuel'];
+  const CLOCK_IN_ROLES = ['dozer', 'excavator', 'water', 'haul', 'spotter', 'qa'];
   const ROLES = MACHINE_ROLES.concat(CREW_ROLES);
   const ROLE_LABEL = {
-    dozer: 'Dozer', excavator: 'Excavator', water: 'Water',
+    dozer: 'Dozer', excavator: 'Excavator', water: 'Water truck', haul: 'Haul truck',
+    spotter: 'Spotter', qa: 'QA',
     survey: 'Survey', foreman: 'Foreman', geology: 'Geology',
     mechanic: 'Mechanic', trucker: 'Trucker', laborer: 'Laborer', fuel: 'Fuel truck'
   };
-  const ROLE_LETTER = { survey: 'S', foreman: 'F', geology: 'G', mechanic: 'M', trucker: 'T', laborer: 'L', fuel: 'FT' };
+  const ROLE_LETTER = {
+    haul: 'H', spotter: 'SP', qa: 'QA',
+    survey: 'S', foreman: 'F', geology: 'G', mechanic: 'M', trucker: 'T', laborer: 'L', fuel: 'FT'
+  };
   function isMachineRole(r) { return MACHINE_ROLES.indexOf(r) >= 0; }
   function isKnownRole(r) { return ROLES.indexOf(r) >= 0; }
+  function isClockInRole(r) { return CLOCK_IN_ROLES.indexOf(r) >= 0; }
   function continueAsLabel(name) {
     if (name) return 'Continue as ' + name;
     if (role === 'trucker') return 'Continue as truck driver';
@@ -237,6 +243,10 @@
       }
     } catch (e) {}
     googleBtnRendered = false;
+    if (isOnShift()) {
+      setOnShift(false);
+      clearSelfPresence(false);
+    }
     publishLocalProfile();
     syncProfileSheet();
     persist();
@@ -270,6 +280,19 @@
     });
   }
 
+  function isOnShift() {
+    try { return localStorage.getItem('onpad:onShift') === '1'; } catch (e) { return false; }
+  }
+  function setOnShift(v) {
+    try {
+      if (v) localStorage.setItem('onpad:onShift', '1');
+      else localStorage.removeItem('onpad:onShift');
+    } catch (e) {}
+  }
+  function canEditMap() {
+    return googleSignedIn() && isOnShift();
+  }
+
   function syncAuthGate() {
     const gate = document.getElementById('authGate');
     const inGoogle = googleSignedIn();
@@ -277,12 +300,223 @@
     document.body.classList.toggle('auth-gated', !inGoogle);
     if (!inGoogle) {
       try { closeSheet('roleSheet'); } catch (e) { /* ignore */ }
+      try { closeSheet('clockInSheet'); } catch (e2) { /* ignore */ }
       googleBtnRendered = false;
       /* Unhide first, then GIS renderButton so host width is real on phones. */
       requestAnimationFrame(() => {
         requestAnimationFrame(() => initGoogleSignIn(true));
       });
     }
+    syncClockInGate();
+  }
+
+  function syncClockInGate() {
+    const sheet = document.getElementById('clockInSheet');
+    const bar = document.getElementById('shiftBar');
+    const inGoogle = googleSignedIn();
+    const on = isOnShift();
+    const needClockIn = inGoogle && !on;
+    document.body.classList.toggle('shift-gated', needClockIn);
+    document.body.classList.toggle('on-shift', !!(inGoogle && on));
+    if (sheet) {
+      if (needClockIn) {
+        sheet.hidden = false;
+        sheet.classList.toggle('switch-only', false);
+        renderClockInRoles();
+      } else if (!(sheet.dataset.switchMode === '1')) {
+        sheet.hidden = true;
+      }
+    }
+    if (bar) bar.hidden = !(inGoogle && on);
+    if (!canEditMap() && placeTool) {
+      placeTool = null;
+      try { ui.tools(); } catch (e) {}
+    }
+  }
+
+  let clockInPick = null;
+  function renderClockInRoles() {
+    const host = document.getElementById('clockInRoles');
+    if (!host) return;
+    const pick = clockInPick || (isKnownRole(role) ? role : 'dozer');
+    clockInPick = pick;
+    host.innerHTML = '';
+    CLOCK_IN_ROLES.forEach((r) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'clock-role-chip role-' + r + (r === pick ? ' active' : '');
+      b.setAttribute('data-role', r);
+      const glyph = document.createElement('span');
+      glyph.className = 'clock-role-glyph';
+      glyph.setAttribute('aria-hidden', 'true');
+      if (isMachineRole(r)) glyph.innerHTML = roleSvg(r);
+      else glyph.innerHTML = '<span class="role-letter">' + (ROLE_LETTER[r] || '?') + '</span>';
+      const lab = document.createElement('span');
+      lab.className = 'clock-role-label';
+      lab.textContent = ROLE_LABEL[r] || r;
+      b.appendChild(glyph);
+      b.appendChild(lab);
+      b.addEventListener('click', () => {
+        clockInPick = r;
+        renderClockInRoles();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function clearSelfPresence(doPersist) {
+    const id = currentUserId();
+    let changed = false;
+    if (id && state.machines) {
+      const prev = state.machines[id];
+      if (prev && !prev.gone) {
+        state.machines[id] = {
+          lat: null, lng: null, t: now(), userId: id, by: id, gone: true,
+          role: prev.role || role, byRole: prev.byRole || role
+        };
+        changed = true;
+      } else if (!prev) {
+        state.machines[id] = {
+          lat: null, lng: null, t: now(), userId: id, by: id, gone: true, role: role, byRole: role
+        };
+        changed = true;
+      }
+    }
+    Object.keys(state.machines || {}).forEach((k) => {
+      if (isKnownRole(k) && state.machines[k] && !(state.machines[k].userId || state.machines[k].by)) {
+        delete state.machines[k];
+        changed = true;
+      }
+    });
+    if (changed && doPersist) persist();
+    return changed;
+  }
+
+  function parkCurrentMachine(opts) {
+    opts = opts || {};
+    const pos = PositionSource.getLatLng();
+    if (!pos) {
+      if (!opts.silent) ui.toast('No GPS yet — cannot park');
+      return null;
+    }
+    if (!state.fleet) state.fleet = [];
+    const roleKey = opts.role || role;
+    const label = ROLE_LABEL[roleKey] || roleKey || 'Machine';
+    const item = stamp({
+      id: uid(),
+      role: roleKey,
+      name: label,
+      parked: true,
+      lat: pos.lat,
+      lng: pos.lng,
+      u: now()
+    });
+    state.fleet.push(item);
+    return item;
+  }
+
+  function startShift(pickedRole) {
+    const r = pickedRole || clockInPick || role;
+    if (!isKnownRole(r)) {
+      ui.toast('Pick a role');
+      return;
+    }
+    role = r;
+    try { localStorage.setItem('onpad:role', role); } catch (e) {}
+    setOnShift(true);
+    clockInPick = role;
+    const sheet = document.getElementById('clockInSheet');
+    if (sheet) {
+      sheet.dataset.switchMode = '';
+      sheet.hidden = true;
+    }
+    publishLocalProfile();
+    syncProfileSheet();
+    const pos = PositionSource.getLatLng();
+    writeLocalPresence(pos);
+    persist();
+    ui.role();
+    syncClockInGate();
+    ui.toast('Shift started · ' + (ROLE_LABEL[role] || role));
+  }
+
+  function openSwitchRole() {
+    if (!isOnShift()) {
+      syncClockInGate();
+      return;
+    }
+    const sheet = document.getElementById('clockInSheet');
+    if (!sheet) return;
+    sheet.dataset.switchMode = '1';
+    sheet.classList.add('switch-only');
+    sheet.hidden = false;
+    clockInPick = role;
+    renderClockInRoles();
+    const title = document.getElementById('clockInTitle');
+    if (title) title.textContent = 'Switch role';
+    const startBtn = document.getElementById('startShiftBtn');
+    if (startBtn) startBtn.textContent = 'Switch to role';
+    const cancel = document.getElementById('clockInCancelBtn');
+    if (cancel) cancel.hidden = false;
+  }
+
+  function closeSwitchRoleSheet() {
+    const sheet = document.getElementById('clockInSheet');
+    if (!sheet) return;
+    sheet.dataset.switchMode = '';
+    sheet.classList.remove('switch-only');
+    const title = document.getElementById('clockInTitle');
+    if (title) title.textContent = 'Pick your role';
+    const startBtn = document.getElementById('startShiftBtn');
+    if (startBtn) startBtn.textContent = 'Start shift';
+    const cancel = document.getElementById('clockInCancelBtn');
+    if (cancel) cancel.hidden = true;
+    if (isOnShift()) sheet.hidden = true;
+    else syncClockInGate();
+  }
+
+  function switchRoleKeepShift(pickedRole) {
+    const r = pickedRole || clockInPick;
+    if (!isKnownRole(r)) {
+      ui.toast('Pick a role');
+      return;
+    }
+    role = r;
+    try { localStorage.setItem('onpad:role', role); } catch (e) {}
+    closeSwitchRoleSheet();
+    publishLocalProfile();
+    syncProfileSheet();
+    writeLocalPresence(PositionSource.getLatLng());
+    persist();
+    ui.role();
+    syncClockInGate();
+    ui.toast('Now · ' + (ROLE_LABEL[role] || role));
+  }
+
+  function parkMachineStayOnShift() {
+    if (!canEditMap()) return;
+    if (!window.confirm('Park here and stay on shift?')) return;
+    const item = parkCurrentMachine();
+    if (!item) return;
+    persist();
+    ui.toast((ROLE_LABEL[role] || role) + ' parked — switch role when ready');
+  }
+
+  function endShift() {
+    if (!isOnShift()) return;
+    if (!window.confirm('Park current machine and hide my location?')) return;
+    if (isMachineRole(role)) {
+      parkCurrentMachine({ silent: true });
+    }
+    setOnShift(false);
+    clearSelfPresence(false);
+    placeTool = null;
+    pathDraft = null;
+    persist();
+    ui.tools();
+    ui.role();
+    syncClockInGate();
+    ui.toast('Shift ended');
   }
 
   function syncGoogleAuthUi() {
@@ -2185,7 +2419,7 @@
     });
     map.on('zoomend', () => { try { pushNearbyUsers(); } catch (e) {} });
 
-    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -2200,6 +2434,12 @@
   }
 
   function onMapClick(e) {
+    if (placeTool && !canEditMap()) {
+      placeTool = null;
+      ui.tools();
+      ui.toast('Clock in to edit the map');
+      return;
+    }
     if (placeTool === 'path-draw' || placeTool === 'path-point') {
       addPathPoint(e.latlng);
       return;
@@ -2937,18 +3177,29 @@
   function presenceDisplayName(m) {
     if (!m) return 'Operator';
     const id = m.userId || m.by || '';
-    const fromItem = String(m.byName || m.name || '').trim();
-    if (fromItem) return fromItem;
-    const p = lookupProfile(id);
-    if (p && p.name) return p.name;
     const roleKey = m.byRole || m.role || '';
-    if (roleKey) return ROLE_LABEL[roleKey] || roleKey;
+    const roleLab = roleKey ? (ROLE_LABEL[roleKey] || roleKey) : '';
+    let name = String(m.byName || '').trim();
+    if (!name) {
+      const p = lookupProfile(id);
+      if (p && p.name) name = p.name;
+    }
+    if (!name) name = String(m.name || '').trim();
+    if (m.parked) {
+      if (name && roleLab) return roleLab + ' · parked · ' + name;
+      if (roleLab) return roleLab + ' · parked';
+      if (name) return name + ' · parked';
+      return 'Parked';
+    }
+    if (name && roleLab) return name + ' · ' + roleLab;
+    if (name) return name;
+    if (roleLab) return roleLab;
     return truncUserId(id) || 'Operator';
   }
 
   function fleetIcon(f, on) {
     const r = (f && f.role) || 'dozer';
-    const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
+    const color = r === 'excavator' ? '#e07030' : (r === 'water' || r === 'haul' ? '#3a9ad9' : (r === 'spotter' || r === 'qa' ? '#9a8a70' : '#f0c040'));
     const label = escHtml(presenceDisplayName(f));
     return L.divIcon({
       className: 'fleet-wrap has-name',
@@ -2987,11 +3238,12 @@
   function roleSvg(r) {
     if (r === 'excavator') return SVG.excavator;
     if (r === 'water') return SVG.water;
+    if (r === 'haul') return SVG.water; /* truck-ish until Icon Shop unfreezes */
     return SVG.dozer;
   }
   function machineIcon(m, me) {
     const r = (m && (m.role || m.byRole)) || 'dozer';
-    const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
+    const color = r === 'excavator' ? '#e07030' : (r === 'water' || r === 'haul' ? '#3a9ad9' : (r === 'spotter' || r === 'qa' ? '#9a8a70' : '#f0c040'));
     const label = escHtml(presenceDisplayName(m));
     return L.divIcon({
       className: 'machine-wrap has-name',
@@ -3004,7 +3256,11 @@
   }
 
   function writeLocalPresence(pos) {
-    if (!pos || !isMachineRole(role)) return;
+    /* Live presence only while on shift (any role). Pedestrian = not published. */
+    if (!pos || !isOnShift() || !googleSignedIn()) {
+      clearSelfPresence(false);
+      return;
+    }
     const id = currentUserId();
     if (!id) return;
     const name = (displayName() || googleName() || '').trim();
@@ -3018,9 +3274,9 @@
       byRole: role,
       userId: id,
       by: id,
-      byName: name
+      byName: name,
+      gone: false
     };
-    /* Drop legacy role-keyed self marker so we don't show two selves */
     if (state.machines[role] && !(state.machines[role].userId || state.machines[role].by)) {
       delete state.machines[role];
     }
@@ -3030,7 +3286,8 @@
     const pos = PositionSource.getLatLng();
     writeLocalPresence(pos);
     Object.keys(machineMarkers).forEach((k) => {
-      if (!state.machines[k]) {
+      const mm = state.machines[k];
+      if (!mm || mm.gone || mm.lat == null || mm.lng == null) {
         layers.machines.removeLayer(machineMarkers[k]);
         delete machineMarkers[k];
       }
@@ -3038,7 +3295,7 @@
     const meId = currentUserId();
     Object.keys(state.machines).forEach((key) => {
       const m = state.machines[key];
-      if (!m || m.lat == null) return;
+      if (!m || m.gone || m.lat == null || m.lng == null) return;
       const uid = m.userId || m.by || (isKnownRole(key) ? '' : key);
       const me = !!(uid && meId && uid === meId) || (!uid && key === role);
       if (!machineMarkers[key]) {
@@ -3328,6 +3585,20 @@
       viewingUserId = null;
       openSheet('roleSheet');
     });
+    const startShiftBtn = document.getElementById('startShiftBtn');
+    if (startShiftBtn) startShiftBtn.addEventListener('click', () => {
+      const sheet = document.getElementById('clockInSheet');
+      if (sheet && sheet.dataset.switchMode === '1') switchRoleKeepShift(clockInPick);
+      else startShift(clockInPick);
+    });
+    const parkBtn = document.getElementById('parkMachineBtn');
+    if (parkBtn) parkBtn.addEventListener('click', () => parkMachineStayOnShift());
+    const switchBtn = document.getElementById('switchRoleBtn');
+    if (switchBtn) switchBtn.addEventListener('click', () => openSwitchRole());
+    const endBtn = document.getElementById('endShiftBtn');
+    if (endBtn) endBtn.addEventListener('click', () => endShift());
+    const clockCancel = document.getElementById('clockInCancelBtn');
+    if (clockCancel) clockCancel.addEventListener('click', () => closeSwitchRoleSheet());
     const nearbyBtn = document.getElementById('nearbyBtn');
     if (nearbyBtn) {
       nearbyBtn.addEventListener('click', (e) => {
@@ -3339,18 +3610,31 @@
     const truckHandle = document.getElementById('truckBarHandle');
     if (truckHandle) truckHandle.addEventListener('click', () => openTruckBar());
     const pathStart = document.getElementById('pathStartBtn');
-    if (pathStart) pathStart.addEventListener('click', () => startPathDraft());
+    if (pathStart) pathStart.addEventListener('click', () => {
+      if (!canEditMap()) { ui.toast('Clock in to edit the map'); return; }
+      startPathDraft();
+    });
     const pathPoint = document.getElementById('pathPointBtn');
     if (pathPoint) pathPoint.addEventListener('click', () => {
+      if (!canEditMap()) { ui.toast('Clock in to edit the map'); return; }
       if (!pathDraft) startPathDraft();
       else { placeTool = 'path-point'; ui.tools(); ui.toast('Tap map to drop a point'); }
     });
     const pathDone = document.getElementById('pathDoneBtn');
-    if (pathDone) pathDone.addEventListener('click', finishPath);
+    if (pathDone) pathDone.addEventListener('click', () => {
+      if (!canEditMap()) { ui.toast('Clock in to edit the map'); return; }
+      finishPath();
+    });
     const pathUndo = document.getElementById('pathUndoBtn');
-    if (pathUndo) pathUndo.addEventListener('click', undoPathPoint);
+    if (pathUndo) pathUndo.addEventListener('click', () => {
+      if (!canEditMap()) { ui.toast('Clock in to edit the map'); return; }
+      undoPathPoint();
+    });
     const pathClear = document.getElementById('pathClearBtn');
-    if (pathClear) pathClear.addEventListener('click', clearPaths);
+    if (pathClear) pathClear.addEventListener('click', () => {
+      if (!canEditMap()) { ui.toast('Clock in to edit the map'); return; }
+      clearPaths();
+    });
     document.querySelectorAll('.tool-path-tag').forEach((b) => {
       b.addEventListener('click', () => setPathTag(b.getAttribute('data-path-tag')));
     });
@@ -3368,6 +3652,10 @@
     document.querySelectorAll('.tool[data-tool]').forEach((b) => {
       b.addEventListener('click', () => {
         const t = b.getAttribute('data-tool');
+        if (!canEditMap()) {
+          ui.toast('Clock in to edit the map');
+          return;
+        }
         if (t === 'corner-pin') { dropCornerPin(); return; }
         /* path tools have dedicated handlers — don't toggle here */
         if (t === 'path-draw' || t === 'path-point') return;
@@ -3598,8 +3886,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v35').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=35')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v36').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=36')).catch(() => {});
   }
 
   function showBootError(msg) {
