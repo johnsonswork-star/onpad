@@ -633,7 +633,7 @@
     return localUserId();
   }
 
-  /* Levels — prefer Profile OnPadAccount (?v=31+). Stub: L1 unless localStorage override.
+  /* Levels — prefer Profile OnPadAccount (?v=32+). Stub: L1 unless localStorage override.
      Cutoffs (Chris): L1 0–999, L2 1k–4999, L3 5000+ likes received. */
   function levelFromLikes(n) {
     const x = Number(n) || 0;
@@ -2784,6 +2784,14 @@
 
   function bind() {
     document.getElementById('roleBtn').addEventListener('click', () => openSheet('roleSheet'));
+    const nearbyBtn = document.getElementById('nearbyBtn');
+    if (nearbyBtn) {
+      nearbyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showNearbySheet();
+      });
+    }
     const truckHandle = document.getElementById('truckBarHandle');
     if (truckHandle) truckHandle.addEventListener('click', () => openTruckBar());
     const pathStart = document.getElementById('pathStartBtn');
@@ -3020,8 +3028,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v31').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=31')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v32').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=32')).catch(() => {});
   }
 
   function showBootError(msg) {
