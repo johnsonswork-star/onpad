@@ -1846,7 +1846,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=42: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=43: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -3811,14 +3811,15 @@
 
   function fleetIcon(f, on) {
     const r = (f && f.role) || 'dozer';
-    const color = r === 'excavator' ? '#e07030' : (r === 'water' || r === 'haul' ? '#3a9ad9' : (r === 'spotter' || r === 'qa' ? '#9a8a70' : '#f0c040'));
+    const color = roleMarkerColor(r);
     const label = escHtml(presenceDisplayName(f));
     return L.divIcon({
       className: 'fleet-wrap has-name',
       iconSize: [88, 44],
       iconAnchor: [44, 14],
       html: '<div class="marker-stack">' +
-        '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div>' +
+        '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' +
+          '<span class="machine-glyph">' + roleSvg(r) + '</span></div>' +
         '<div class="marker-name">' + label + '</div></div>'
     });
   }
@@ -3852,21 +3853,34 @@
 
   /* machines — live GPS presence keyed by userId */
   function roleSvg(r) {
+    /* Frozen in-app glyphs — match shift role on live markers + sheets */
     if (r === 'excavator') return SVG.excavator;
     if (r === 'water') return SVG.water;
     if (r === 'haul') return SVG.water; /* truck-ish until Icon Shop unfreezes */
+    if (r === 'spotter' || r === 'qa') {
+      const letter = ROLE_LETTER[r] || (r === 'qa' ? 'QA' : 'SP');
+      return '<span class="role-letter-mark" aria-hidden="true">' + letter + '</span>';
+    }
     return SVG.dozer;
+  }
+  function roleMarkerColor(r) {
+    if (r === 'excavator') return '#e07030';
+    if (r === 'water' || r === 'haul') return '#3a9ad9';
+    if (r === 'spotter' || r === 'qa') return '#9a8a70';
+    return '#f0c040'; /* dozer + default */
   }
   function machineIcon(m, me) {
     const r = (m && (m.role || m.byRole)) || 'dozer';
-    const color = r === 'excavator' ? '#e07030' : (r === 'water' || r === 'haul' ? '#3a9ad9' : (r === 'spotter' || r === 'qa' ? '#9a8a70' : '#f0c040'));
+    const color = roleMarkerColor(r);
     const label = escHtml(presenceDisplayName(m));
+    /* Ring/shadow use currentColor; glyph must contrast (dark) — not same as fill */
     return L.divIcon({
       className: 'machine-wrap has-name',
       iconSize: [88, 46],
       iconAnchor: [44, 15],
       html: '<div class="marker-stack">' +
-        '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div>' +
+        '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' +
+          '<span class="machine-glyph">' + roleSvg(r) + '</span></div>' +
         '<div class="marker-name">' + label + (me ? ' · YOU' : '') + '</div></div>'
     });
   }
@@ -4566,8 +4580,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v42').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=42')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v43').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=43')).catch(() => {});
   }
 
   function showBootError(msg) {

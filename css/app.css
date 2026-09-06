@@ -966,7 +966,21 @@ body.truck-open .rail {
   box-shadow: 0 0 0 2px currentColor, 0 2px 0 #0008;
   box-sizing: border-box;
 }
-.machine-body svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.machine-body svg { width: 18px; height: 18px; flex: 0 0 auto; color: #1c1814; fill: currentColor; }
+.machine-glyph {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  color: #1c1814;
+  pointer-events: none;
+}
+.machine-glyph svg { color: #1c1814; }
+.role-letter-mark {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #1c1814;
+  line-height: 1;
+}
 .machine-me { outline: 2px dashed #fff8; outline-offset: 2px; }
 .fleet-wrap {
   width: 28px; height: 28px;
@@ -983,6 +997,8 @@ body.truck-open .rail {
   box-sizing: border-box;
 }
 .fleet-body svg { width: 16px; height: 16px; color: #1c1814; flex: 0 0 auto; }
+.fleet-body .machine-glyph { color: #1c1814; }
+.fleet-body .role-letter-mark { color: #1c1814; }
 .acc-ring {
   position: absolute;
   border: 2px dashed #f5d54788;
