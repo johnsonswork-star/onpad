@@ -1,7 +1,7 @@
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 
-Last updated: 2026-09-06
+Last updated: 2026-09-06 (moderation: L3 swipe queue; Send-to-Grok cancelled)
 
 ---
 
@@ -14,7 +14,7 @@ A live job-site map where:
 - Likes and dislikes define the person.
 - Object taps rate the object. Name taps open profile.
 - Mods look like normal players until they turn tools on.
-- Staff can send a player list to Grok Bot and apply restrictions.
+- Flag / report: L3+ auto-removes; below L3 goes to an L3+ swipe review queue with Site Ops punishments.
 
 ---
 
@@ -171,9 +171,39 @@ Then bio, hours, machines, notes.
 
 ---
 
-## 7. Player list (Grok Bot + mods)
+## 7. Reports & L3 review queue
 
-List is for nearby / live / parked owners.
+Flag on an object (orders, machines, paths, etc.) enters moderation.
+
+### Reporter level
+
+| Reporter | Immediate effect |
+|----------|------------------|
+| **L3+** (5,000+ likes received) | Auto-remove the reported object (same as today’s L3 auto-delete). Leave as auto-remove unless Cos says otherwise. |
+| **Below L3** | Object stays up; report enters the **L3+ review queue** (not a public board). |
+
+### Review queue (L3+ only)
+
+- Accessible only to users at **L3+** (and founders/mods if Profile gates that way — Profile owns the L3 gate).
+- **Tinder-style / swipe card UI** — one report at a time. Not KEEP/DROP vote counters alone.
+- Card shows: reported object preview, reporter, reason/context, owner.
+- Reviewer actions:
+  - **Agree (violation)** → choose a **punishment** from Site Ops §10 (Warn / Mute / Tool restrict / Movement restrict / Kick / Temp ban / Ban). Apply + log on the player’s public restriction record. Object may also be removed.
+  - **Disagree** → dismiss the report (clear from queue; object stays unless separately removed).
+- Profile owns: L3 gate helpers, punishment record / restriction history API.
+- App Builder owns: map Flag entry, queue card UI on the map app, wiring to Profile helpers.
+- Fold implementation into **P2/P4** after clock-in P1 (`?v=36`). Bump `?v=` as needed; coordinate cache with Profile (`?v=37+` scores/mod overlays).
+
+### Deprecated
+
+- Old multi-vote KEEP/DROP review board is superseded by the swipe queue for below-L3 reports.
+- **`Send selected to Grok Bot` / Cos handoff is CANCELLED** — dropped for now. Do not implement.
+
+---
+
+## 8. Nearby / player list
+
+List is for nearby / live / parked owners (browse + open profile). No Cos / Grok Bot export.
 
 Each row:
 
@@ -181,23 +211,12 @@ Each row:
 - Role and state: live / parked / off shift
 - Social score `▲ ▼`
 - Distance or last seen
-- Checkbox for multi-select
 
-Action on the list:
-
-- `Send selected to Grok Bot`
-
-Payload includes:
-
-- Player IDs and names
-- Scores and current restrictions
-- Role / live / parked state
-- Optional reason
-- Timestamp and map context
+No multi-select send action.
 
 ---
 
-## 8. Profiles
+## 9. Profiles
 
 Clickable from list, marker name, object owner, and score.
 
@@ -212,7 +231,7 @@ Profile shows:
 
 ---
 
-## 9. Mod tools
+## 10. Mod tools
 
 Mods use the same default display as everyone else.
 
@@ -236,6 +255,7 @@ While on:
 
 - Player rows and profiles gain: Warn, Mute, Tool restrict, Movement restrict, Kick, Temp ban, Ban
 - Object sheets gain: restrict owner, remove object
+- L3+ also get the **report review queue** (swipe cards) even if tools are off — queue is level-gated, not only mod-tools-gated
 - Thin private chip only the mod sees: `Tools on`
 
 Restrictions write to the player’s public record. The buttons that apply them stay behind the click.
@@ -256,7 +276,7 @@ Do not make profile the punishment screen. Profile stays social. Restrictions ar
 
 ---
 
-## 10. Button labels
+## 11. Button labels
 
 Clock-in sheet:
 
@@ -283,9 +303,14 @@ Object sheet overflow:
 - `Details`
 - Mod-only items if tools on
 
-List:
+Nearby list:
 
-- `Send selected to Grok Bot`
+- Open profile only (no Send to Grok)
+
+L3+ review queue cards:
+
+- `Agree` → pick punishment (§10)
+- `Dismiss`
 
 Mod bar:
 
@@ -293,18 +318,20 @@ Mod bar:
 
 ---
 
-## 11. Implementation notes
+## 12. Implementation notes
 
 - Live location publishes only after a role is confirmed.
 - Ending shift always parks first, then unpublishes location.
 - Parked machines keep owner ID so likes still attach to the person.
 - Score on owner updates even if the machine is parked and the owner is off-map.
-- Grok Bot list is a snapshot, not an auto-ban.
+- Report: L3+ reporter → auto-remove; below L3 → L3+ swipe queue (Agree→punishment / Dismiss).
+- Punishments write to the player’s public restriction record (Profile API).
+- Do **not** implement Send-to-Grok / Cos handoff (cancelled).
 - Mod tools default off on launch (shared screen / locked phone).
 
 ---
 
-## 12. Acceptance checks
+## 13. Acceptance checks
 
 - Cannot edit map before picking a role.
 - Live pin appears only after start shift.
@@ -316,4 +343,19 @@ Mod bar:
 - Score visible on pin, list, sheet, and profile header.
 - Like/dislike updates object + owner + history.
 - Mod looks normal until `Mod tools` is tapped.
-- Selected players can be sent to Grok Bot.
+- Below-L3 Flag enters L3+ swipe review queue; L3+ Flag auto-removes.
+- Agree on a queue card requires a §10 punishment; Dismiss clears the report.
+- No Send-to-Grok action.
+
+---
+
+## 14. Phasing (App Builder + Profile)
+
+| Phase | Owner | Notes |
+|-------|-------|-------|
+| P1 Clock-in / park / end | App Builder | Shipped `?v=36` |
+| P2 Object sheet tap targets | App Builder | Machine→object sheet; name→profile |
+| P3 Scores ▲▼ | Profile helpers + map display | Likely `?v=37+` |
+| P4 Mod stealth + L3 swipe report queue | Map UI Builder; L3 gate + punishment record Profile | After P1; bump `?v=` as needed |
+| P5 Send to Grok Bot | — | **CANCELLED** |
+
