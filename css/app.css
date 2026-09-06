@@ -1435,3 +1435,36 @@ button.placer-chip {
   font-weight: 700;
   text-align: center;
 }
+
+/* Presence name labels under machine/fleet markers */
+.machine-wrap.has-name,
+.fleet-wrap.has-name {
+  width: 88px;
+  height: 46px;
+  overflow: visible;
+}
+.marker-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 88px;
+  pointer-events: auto;
+}
+.marker-name {
+  margin-top: 2px;
+  max-width: 86px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background: #1c1814ee;
+  border: 1px solid #f5d54799;
+  color: #f5d547;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}

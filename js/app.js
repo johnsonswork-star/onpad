@@ -536,6 +536,23 @@
     (state.digPads || []).forEach(consider);
     (state.fleet || []).forEach(consider);
     (state.paths || []).forEach(consider);
+    /* Live GPS / presence (keyed by userId) */
+    Object.keys(state.machines || {}).forEach((k) => {
+      const m = state.machines[k];
+      if (!m) return;
+      const id = m.userId || m.by || (isKnownRole(k) ? '' : k);
+      if (!id && !isKnownRole(k)) return;
+      consider({
+        userId: id || '',
+        by: id || '',
+        byName: m.byName || (lookupProfile(id) || {}).name || '',
+        byRole: m.byRole || m.role || (isKnownRole(k) ? k : ''),
+        role: m.role || m.byRole || (isKnownRole(k) ? k : ''),
+        lat: m.lat,
+        lng: m.lng,
+        gone: false
+      });
+    });
     return [...byId.values()];
   }
 
@@ -569,7 +586,7 @@
       document.body.appendChild(panel);
     }
     if (!rows.length) {
-      panel.innerHTML = '<div class="nearby-head">Nearby users</div><div class="nearby-empty">No stamped users in view</div>';
+      panel.innerHTML = '<div class="nearby-head">Nearby users</div><div class="nearby-empty">No users in view</div>';
       panel.hidden = false;
       return;
     }
@@ -1724,8 +1741,17 @@
     const machines = Object.assign({}, state.machines);
     Object.keys(remote.machines || {}).forEach((k) => {
       const r = remote.machines[k];
-      const l = machines[k];
-      if (!l || (r && r.t >= l.t)) machines[k] = r;
+      if (!r) return;
+      const id = r.userId || r.by || (isKnownRole(k) ? '' : k);
+      const key = id || k;
+      const next = Object.assign({}, r);
+      if (id) { next.userId = id; next.by = id; }
+      if (!next.role && isKnownRole(k)) next.role = k;
+      if (!next.byRole) next.byRole = next.role || '';
+      const l = machines[key];
+      if (!l || (next.t || 0) >= (l.t || 0)) machines[key] = next;
+      /* Drop legacy role-only key once we have userId presence for that role+user */
+      if (id && isKnownRole(k) && machines[k] && k !== key) delete machines[k];
     });
     state.machines = machines;
     try { localStorage.setItem(storageKey(state.job), JSON.stringify(state)); } catch (e) {}
@@ -2820,13 +2846,29 @@
     ui.toast(name + ' last-known set — drag to move');
   }
 
-  function fleetIcon(r, on) {
+  function presenceDisplayName(m) {
+    if (!m) return 'Operator';
+    const id = m.userId || m.by || '';
+    const fromItem = String(m.byName || m.name || '').trim();
+    if (fromItem) return fromItem;
+    const p = lookupProfile(id);
+    if (p && p.name) return p.name;
+    const roleKey = m.byRole || m.role || '';
+    if (roleKey) return ROLE_LABEL[roleKey] || roleKey;
+    return truncUserId(id) || 'Operator';
+  }
+
+  function fleetIcon(f, on) {
+    const r = (f && f.role) || 'dozer';
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
+    const label = escHtml(presenceDisplayName(f));
     return L.divIcon({
-      className: 'fleet-wrap',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      html: '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div>'
+      className: 'fleet-wrap has-name',
+      iconSize: [88, 44],
+      iconAnchor: [44, 14],
+      html: '<div class="marker-stack">' +
+        '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' + roleSvg(r) + '</div>' +
+        '<div class="marker-name">' + label + '</div></div>'
     });
   }
 
@@ -2839,58 +2881,96 @@
       const on = selected && selected.kind === 'fleet' && selected.id === f.id;
       /* Last-known stays until moved — always allow drag to update location */
       const m = L.marker([f.lat, f.lng], {
-        icon: fleetIcon(f.role, on),
+        icon: fleetIcon(f, on),
         zIndexOffset: 700,
         draggable: true
       }).addTo(layers.fleet);
-      m.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'fleet', id: f.id }); });
+      m.on('click', (e) => {
+        L.DomEvent.stop(e);
+        select({ kind: 'fleet', id: f.id });
+        const uid = f.userId || f.by || '';
+        if (uid) openUserProfile(uid);
+      });
       wirePixelDrag(m, () => state.fleet, f.id);
     });
   }
 
-  /* machines */
+  /* machines — live GPS presence keyed by userId */
   function roleSvg(r) {
     if (r === 'excavator') return SVG.excavator;
     if (r === 'water') return SVG.water;
     return SVG.dozer;
   }
-  function machineIcon(r, me) {
+  function machineIcon(m, me) {
+    const r = (m && (m.role || m.byRole)) || 'dozer';
     const color = r === 'excavator' ? '#e07030' : (r === 'water' ? '#3a9ad9' : '#f0c040');
+    const label = escHtml(presenceDisplayName(m));
     return L.divIcon({
-      className: 'machine-wrap',
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
-      html: '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div>'
+      className: 'machine-wrap has-name',
+      iconSize: [88, 46],
+      iconAnchor: [44, 15],
+      html: '<div class="marker-stack">' +
+        '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' + roleSvg(r) + '</div>' +
+        '<div class="marker-name">' + label + (me ? ' · YOU' : '') + '</div></div>'
     });
+  }
+
+  function writeLocalPresence(pos) {
+    if (!pos || !isMachineRole(role)) return;
+    const id = currentUserId();
+    if (!id) return;
+    const name = (displayName() || googleName() || '').trim();
+    state.machines[id] = {
+      lat: pos.lat,
+      lng: pos.lng,
+      hdg: pos.heading,
+      t: pos.t || now(),
+      accM: pos.accM,
+      role: role,
+      byRole: role,
+      userId: id,
+      by: id,
+      byName: name
+    };
+    /* Drop legacy role-keyed self marker so we don't show two selves */
+    if (state.machines[role] && !(state.machines[role].userId || state.machines[role].by)) {
+      delete state.machines[role];
+    }
   }
 
   function drawMachines() {
     const pos = PositionSource.getLatLng();
-    if (pos && isMachineRole(role)) {
-      state.machines[role] = { lat: pos.lat, lng: pos.lng, hdg: pos.heading, t: pos.t, accM: pos.accM };
-    }
+    writeLocalPresence(pos);
     Object.keys(machineMarkers).forEach((k) => {
       if (!state.machines[k]) {
         layers.machines.removeLayer(machineMarkers[k]);
         delete machineMarkers[k];
       }
     });
-    Object.keys(state.machines).forEach((r) => {
-      const m = state.machines[r];
+    const meId = currentUserId();
+    Object.keys(state.machines).forEach((key) => {
+      const m = state.machines[key];
       if (!m || m.lat == null) return;
-      const me = r === role;
-      if (!machineMarkers[r]) {
-        machineMarkers[r] = L.marker([m.lat, m.lng], {
-          icon: machineIcon(r, me),
-          zIndexOffset: 800,
-          interactive: false
+      const uid = m.userId || m.by || (isKnownRole(key) ? '' : key);
+      const me = !!(uid && meId && uid === meId) || (!uid && key === role);
+      if (!machineMarkers[key]) {
+        machineMarkers[key] = L.marker([m.lat, m.lng], {
+          icon: machineIcon(m, me),
+          zIndexOffset: me ? 850 : 800,
+          interactive: true
         }).addTo(layers.machines);
+        machineMarkers[key].on('click', (e) => {
+          L.DomEvent.stop(e);
+          const id = m.userId || m.by || uid;
+          if (id) openUserProfile(id);
+          else ui.toast(presenceDisplayName(m));
+        });
       } else {
-        machineMarkers[r].setLatLng([m.lat, m.lng]);
-        machineMarkers[r].setIcon(machineIcon(r, me));
+        machineMarkers[key].setLatLng([m.lat, m.lng]);
+        machineMarkers[key].setIcon(machineIcon(m, me));
       }
       if (m.hdg != null && !isNaN(m.hdg)) {
-        const el = machineMarkers[r].getElement();
+        const el = machineMarkers[key].getElement();
         if (el) {
           const body = el.querySelector('.machine-body');
           if (body) body.style.transform = 'rotate(' + m.hdg + 'deg)';
@@ -2912,6 +2992,7 @@
         accCircle.setRadius(pos.accM || 8);
       }
     }
+    try { pushNearbyUsers(); } catch (e) {}
   }
 
   /* selection bar */
@@ -3429,8 +3510,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v33').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=33')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v34').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=34')).catch(() => {});
   }
 
   function showBootError(msg) {
