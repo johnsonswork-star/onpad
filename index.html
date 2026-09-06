@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=25" />
+  <link rel="stylesheet" href="css/app.css?v=26" />
 </head>
 <body>
   <div id="app">
@@ -211,6 +211,16 @@
     <div id="toast" class="toast" hidden></div>
   </div>
 
+  <!-- Google required — blocks map until signed in -->
+  <div id="authGate" class="auth-gate" hidden>
+    <div class="auth-gate-card">
+      <h1 class="auth-gate-title">OnPad</h1>
+      <p class="auth-gate-copy">Sign in with Google to use OnPad.</p>
+      <div id="authGateGoogleBtn" class="google-btn-host" aria-label="Sign in with Google"></div>
+      <button type="button" id="authGateGoogleFallback" class="fat primary google-signin-fallback">Sign in with Google</button>
+    </div>
+  </div>
+
   <!-- Profile sheet — same entry as role (#roleBtn). No second nav. -->
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
@@ -231,7 +241,7 @@
       </div>
       <div class="google-auth" id="googleAuthBlock">
         <label class="profile-label" for="googleSignInFallback">Sign in with Google</label>
-        <p class="google-auth-rec">Recommended — stamps show your name on the map</p>
+        <p class="google-auth-rec">Required — Sign in with Google to use OnPad</p>
         <div id="googleSignInBtn" class="google-btn-host" aria-label="Sign in with Google"></div>
         <button type="button" id="googleSignInFallback" class="fat primary google-signin-fallback">Sign in with Google</button>
         <div id="googleSignedIn" class="google-signed-in" hidden>
@@ -240,7 +250,7 @@
         </div>
       </div>
       <label class="profile-label" for="displayNameInput">Display name</label>
-      <input id="displayNameInput" class="name-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Optional" enterkeyhint="done" />
+      <input id="displayNameInput" class="name-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Your name (shows on map)" enterkeyhint="done" />
       <label class="profile-label" for="opRoleSelect">Operators</label>
       <select id="opRoleSelect" class="role-select" aria-label="Machine operator">
         <option value="">Not an operator</option>
@@ -263,7 +273,7 @@
         <button type="button" id="continueAsBtn" class="fat primary">Continue as dozer operator</button>
         <span id="userIdChip" class="userid-chip" title="Account id"></span>
       </div>
-      <p class="hint profile-hint">Optional — open the yellow top bar → Profile → Sign in with Google so your name shows on map adds. Map stays open without signing in.</p>
+      <p class="hint profile-hint">Sign in with Google is required. Add your name so claims show who you are. Tap Continue after you set role and name.</p>
       <button type="button" class="sheet-close" data-close="roleSheet">Close</button>
     </div>
   </div>
@@ -291,6 +301,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=25"></script>
+  <script src="js/app.js?v=26"></script>
 </body>
 </html>

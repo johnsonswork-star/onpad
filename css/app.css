@@ -1175,3 +1175,53 @@ body.truck-open .rail {
 .leaflet-div-icon.req-move { background: #3a3228; color: var(--safety); }
 .req-icon.done { opacity: 0.4; }
 .done-chip { color: #b6f08a; font-size: 12px; font-weight: 800; }
+
+
+/* Google auth gate — full-screen until googleSignedIn() */
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  background: rgba(14, 12, 10, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.auth-gate[hidden] { display: none !important; }
+.auth-gate-card {
+  width: min(420px, 100%);
+  padding: 28px 22px 24px;
+  border: 3px solid var(--edge);
+  border-radius: 16px;
+  background: var(--dirt-2);
+  box-shadow: 0 12px 40px #000a;
+  text-align: center;
+}
+.auth-gate-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--safety);
+  text-transform: uppercase;
+}
+.auth-gate-copy {
+  margin: 0 0 20px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #f2ebe3;
+}
+.auth-gate .google-btn-host { margin-bottom: 8px; }
+.auth-gate .google-signin-fallback { margin-top: 10px; }
+body.auth-gated #app {
+  pointer-events: none;
+  user-select: none;
+  filter: brightness(0.45);
+}
+body.auth-gated #authGate { pointer-events: auto; }
+

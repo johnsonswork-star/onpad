@@ -2,7 +2,7 @@
 
 Phone-first jobsite map for excavation crews (dozers, excavators, water trucks, dump trucks). Drop pads/roads/piles on satellite, call water or cleanup, stake a **dig pad** from the dozer’s GPS, and draw **haul paths** so trucks know where to drive.
 
-Optional Google Sign-In (browser GIS). No invite codes, no CAD, no payments. One static page — open the link and see the pad.
+Google Sign-In is **required** (browser GIS). No invite codes, no CAD, no payments. One static page — sign in, then use the pad.
 
 **Source:** [https://github.com/johnsonswork-star/onpad](https://github.com/johnsonswork-star/onpad)
 
@@ -20,7 +20,7 @@ Add to home screen (PWA) after it is on HTTPS.
 
 ## How to use
 
-1. Allow GPS. The yellow machine marker is **this phone**. Big top bar = **who you are** (Dozer / Excavator / Water). Tap it for **Profile** (optional name; Operators vs Site crew; optional **Sign in with Google**; role-aware Continue). GPS + LIVE sit under that identity bar. **No job code** — everyone on the Pages URL shares one open site.
+1. **Sign in with Google** (required gate). Allow GPS. The yellow machine marker is **this phone**. Big top bar = **who you are** (Dozer / Excavator / Water). Tap it for **Profile** (display name; Operators vs Site crew; Sign out; role-aware Continue). GPS + LIVE sit under that identity bar. **No job code** — everyone on the Pages URL shares one open site.
 2. **Left rail (Machine):** starts closed on phone (edge chevron). Place Dozer / Excavator / Water. Calls: Light / Heavy / Clean. Dozer stakeout: **Pin**, **Undo**, **Cut**.
 3. **Right rail (Site):** Pad / Road / Pile, Map style, Here (recenter).
 4. **Bottom truck bar:** fat **TRUCK PATHS** handle. Open it → **Start** a haul route, tap the map to drop points, **Done** to save, **In** / **Out** to tag follow-road. Paths sync live with the site.
@@ -31,12 +31,12 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 ## Sync
 
 - State is saved in `localStorage` for the shared site room.
-- Created features carry a profile stamp: `by` / `userId`, `byName`, `byRole`, `stampedAt` (Profile & Settings). Soft-lock after 30s. When signed in with Google, `userId` / `by` is the Google JWT `sub` (majority-report bans later). Unsigned users keep an anon local id. No ban UI yet.
+- Created features carry a profile stamp: `by` / `userId`, `byName`, `byRole`, `stampedAt` (Profile & Settings). Soft-lock after 30s. `userId` / `by` is the Google JWT `sub`. `byName` uses display name or Google name. Sign-out returns to the auth gate (anon id kept for stamp history). No ban UI yet.
 - **Live (best-effort):** MQTT room `onpad/v1/SITE` on public brokers. Badge **LIVE** / **SOLO**. Obscure room, not private.
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=25`, service worker `onpad-v25`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=26`, service worker `onpad-v26`).
 
 
 ## Profile stamp API (App Builder)
@@ -69,7 +69,7 @@ Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock 
 
 ## Google Sign-In
 
-Browser-only [Google Identity Services](https://developers.google.com/identity/gsi/web) button in the Profile sheet. OAuth **Web client ID** is embedded in the page (no client secret, no server). Authorized JavaScript origin: `https://johnsonswork-star.github.io`. Stamps / `OnPadAccount.userId()` use the Google JWT `sub` while signed in; unsigned stays on the anon `onpad:userId`. Sign-out clears `onpad:google*` keys only — map stamps remain.
+Browser-only [Google Identity Services](https://developers.google.com/identity/gsi/web). A full-screen gate blocks the map until signed in. OAuth **Web client ID** is embedded in the page (no client secret, no server). Authorized JavaScript origin: `https://johnsonswork-star.github.io`. Stamps / `OnPadAccount.userId()` use the Google JWT `sub`. Sign-out clears `onpad:google*` keys and shows the gate again — map stamps remain.
 
 ## Stack
 
