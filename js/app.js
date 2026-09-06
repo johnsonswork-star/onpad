@@ -462,8 +462,131 @@
   }
   function metaWithPlacer(titleHtml, item) {
     const who = placerLabel(item);
+    const uid = item ? (item.userId || item.by || '') : '';
+    const placer = who
+      ? ('<button type="button" class="selected-placer placer-link" data-user-id="' +
+         escHtml(uid) + '" title="View profile">' + escHtml(who) + '</button>')
+      : '';
     return '<div class="selected-meta-text"><div class="selected-title">' + titleHtml +
-      '</div>' + (who ? '<div class="selected-placer">' + escHtml(who) + '</div>' : '') + '</div>';
+      '</div>' + placer + '</div>';
+  }
+
+  function openUserProfile(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return false;
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.openProfile === 'function') {
+        const ok = window.OnPadAccount.openProfile(id);
+        if (ok === false) {
+          ui.toast('Profile unavailable');
+          return false;
+        }
+        return true;
+      }
+    } catch (e) {}
+    ui.toast('Profile sheet coming soon');
+    return false;
+  }
+
+  function wirePlacerProfileClicks(root) {
+    if (!root) return;
+    root.querySelectorAll('.placer-link, .placer-chip[data-user-id]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openUserProfile(el.getAttribute('data-user-id'));
+      });
+    });
+  }
+
+  function collectNearbyUsers() {
+    if (!map) return [];
+    const b = map.getBounds();
+    if (!b) return [];
+    const byId = new Map();
+    function consider(item) {
+      if (!item || item.gone || item.lat == null || item.lng == null) return;
+      try {
+        if (!b.contains([item.lat, item.lng])) return;
+      } catch (e) { return; }
+      const id = item.userId || item.by || '';
+      if (!id) return;
+      const name = (item.byName || item.name || '').trim();
+      const roleKey = item.byRole || item.role || '';
+      const prev = byId.get(id);
+      if (!prev) {
+        byId.set(id, {
+          userId: id,
+          name: name,
+          role: roleKey,
+          lat: item.lat,
+          lng: item.lng
+        });
+      }
+    }
+    (state.surfaces || []).forEach(consider);
+    (state.requests || []).forEach(consider);
+    (state.digPads || []).forEach(consider);
+    (state.fleet || []).forEach(consider);
+    (state.paths || []).forEach(consider);
+    return [...byId.values()];
+  }
+
+  function pushNearbyUsers() {
+    const rows = collectNearbyUsers();
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.setNearbyUsers === 'function') {
+        window.OnPadAccount.setNearbyUsers(rows);
+      }
+    } catch (e) {}
+    try {
+      if (window.OnPadAccount) window.OnPadAccount.nearbyUsers = () => collectNearbyUsers();
+    } catch (e2) {}
+    const btn = document.getElementById('nearbyBtn');
+    if (btn) {
+      btn.hidden = false;
+      btn.textContent = 'NEARBY ' + rows.length;
+      btn.setAttribute('data-count', String(rows.length));
+    }
+    return rows;
+  }
+
+  function showNearbySheet() {
+    const rows = pushNearbyUsers();
+    let panel = document.getElementById('nearbyPanel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'nearbyPanel';
+      panel.className = 'nearby-panel';
+      panel.hidden = true;
+      document.body.appendChild(panel);
+    }
+    if (!rows.length) {
+      panel.innerHTML = '<div class="nearby-head">Nearby users</div><div class="nearby-empty">No stamped users in view</div>';
+      panel.hidden = false;
+      return;
+    }
+    panel.innerHTML = '<div class="nearby-head">Nearby · ' + rows.length +
+      ' <button type="button" class="nearby-close" id="nearbyClose">✕</button></div><ul class="nearby-list"></ul>';
+    const ul = panel.querySelector('.nearby-list');
+    rows.forEach((r) => {
+      const li = document.createElement('li');
+      const label = (r.name || truncUserId(r.userId)) +
+        (r.role ? (' · ' + (ROLE_LABEL[r.role] || r.role)) : '');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'nearby-user';
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        panel.hidden = true;
+        openUserProfile(r.userId);
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+    const close = panel.querySelector('#nearbyClose');
+    if (close) close.addEventListener('click', () => { panel.hidden = true; });
+    panel.hidden = false;
   }
   function lockNoteEl() {
     const note = document.createElement('span');
@@ -510,7 +633,7 @@
     return localUserId();
   }
 
-  /* Levels — prefer Profile OnPadAccount (?v=29+). Stub: L1 unless localStorage override.
+  /* Levels — prefer Profile OnPadAccount (?v=31+). Stub: L1 unless localStorage override.
      Cutoffs (Chris): L1 0–999, L2 1k–4999, L3 5000+ likes received. */
   function levelFromLikes(n) {
     const x = Number(n) || 0;
@@ -1572,7 +1695,9 @@
       const c = map.getCenter();
       lastLocalView = { lat: c.lat, lng: c.lng, zoom: map.getZoom() };
       try { localStorage.setItem('onpad:view', JSON.stringify(lastLocalView)); } catch (e) {}
+      try { pushNearbyUsers(); } catch (e2) {}
     });
+    map.on('zoomend', () => { try { pushNearbyUsers(); } catch (e) {} });
 
     ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar'].forEach((id) => {
       const el = document.getElementById(id);
@@ -2460,8 +2585,10 @@
           byName: r.claimedByName,
           byRole: r.claimedByRole
         });
-        const chip = document.createElement('div');
+        const chip = document.createElement('button');
+        chip.type = 'button';
         chip.className = 'placer-chip claimed-chip';
+        chip.setAttribute('data-user-id', r.claimedBy || r.byClaimed || '');
         chip.textContent = 'Claimed by ' + claimWho;
         meta.appendChild(chip);
       }
@@ -2470,8 +2597,10 @@
           || (ROLE_LABEL[r.completedByRole] || r.completedByRole || '')
           || truncUserId(r.completedBy)
           || 'Done';
-        const chip = document.createElement('div');
+        const chip = document.createElement('button');
+        chip.type = 'button';
         chip.className = 'placer-chip done-chip';
+        chip.setAttribute('data-user-id', r.completedBy || '');
         chip.textContent = 'Completed by ' + doneWho;
         meta.appendChild(chip);
       } else if (!claimed) {
@@ -2512,6 +2641,11 @@
       );
       appendKillOrLock(acts, p, () => removeItem(state.paths, p));
     }
+    /* Claim/done chips — open that user's profile */
+    meta.querySelectorAll('.placer-chip').forEach((chip) => {
+      /* set data-user-id if claim/done handlers left text only — patched below too */
+    });
+    wirePlacerProfileClicks(meta);
   }
 
   function actBtn(label, cls, fn) {
@@ -2558,6 +2692,7 @@
     drawMachines();
     if (selected) select(selected);
     else document.getElementById('selectedBar').hidden = true;
+    try { pushNearbyUsers(); } catch (e) {}
   }
 
   /* events */
@@ -2885,8 +3020,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v29').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=29')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v31').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=31')).catch(() => {});
   }
 
   function showBootError(msg) {
