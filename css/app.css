@@ -672,6 +672,22 @@ body.rails-right-open .selected-bar {
   background: #2a2418;
   color: var(--brass);
 }
+
+/* Social credit level — fat outdoor-friendly under profile progress */
+.social-credit-level {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--brass);
+  background: #2a2418;
+  color: var(--brass);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
 .code-input {
   width: 100%;
   min-height: 64px;

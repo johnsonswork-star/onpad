@@ -36,7 +36,7 @@ v1 GPS is **this phone**, standing in for the dozer’s Trimble. Hook: `Position
 
 ## GitHub Pages
 
-Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=27`, service worker `onpad-v27`).
+Deploys from **main** `/` (static HTML, `.nojekyll`). Push to `main` updates the live site. Assets are cache-bumped (`?v=28`, service worker `onpad-v28`).
 
 
 ## Profile stamp API (App Builder)
@@ -46,7 +46,7 @@ Settings owns the Profile sheet progress meter (Name · Role · Ready). Map perm
 Features stamped via `stamp()` / `OnPadAccount.stamp(obj)` carry:
 
 - `by` / `userId` — Google JWT `sub` when signed in, else anonymous local id
-- `byName` / `byRole` — display name + role at stamp time
+- `byName` / `byRole` — display name (or Google / email local-part / Operator) + role at stamp time
 - `stampedAt` — epoch ms (Builder: soft-lock / permanence after **30s**)
 
 Live registry: `state.profiles[userId] = { userId, name, role, u }` (synced in slim MQTT state; merge keeps newest `u`).
@@ -55,16 +55,50 @@ Live registry: `state.profiles[userId] = { userId, name, role, u }` (synced in s
 window.OnPadAccount = {
   userId: () => /* Google sub when signed in, else anon local id */,
   profile: () => ({ userId, name, role }),
-  stamp: (obj) => /* mutates + returns obj */,
+  stamp: (obj) => /* mutates + returns obj; byName always set */,
   lookup: (userId) => /* from state.profiles or feature byName fallback */,
   profileLabel: (userIdOrFeature) => /* "Name · Role" or truncated id */,
   signedIn: () => /* true when onpad:googleSub set */,
   signOut: () => /* clear google* keys; keep anon id + map stamps */,
-  STAMP_LOCK_MS: 30000 // documented constant — Builder implements the 30s lock
+  likesReceived: (userId) => /* unique by+featureId likes on that user's stamps */,
+  level: (userId) => /* 1 | 2 | 3 */,
+  myLevel: () => /* level(localUserId()) */,
+  getLevel: () => /* alias of myLevel */,
+  recordLike: (featureId, targetUserId) => /* idempotent per by+featureId */,
+  canAutoDeleteReport: (reporterId) => /* true when level(reporter) >= 3 */,
+  isBoardVoter: (userId) => /* signed-in or has userId */,
+  STAMP_LOCK_MS: 30000,
+  LEVEL_L2_MIN: 1000,
+  LEVEL_L3_MIN: 5000
 };
 ```
 
-Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock using `stampedAt` + `STAMP_LOCK_MS`.
+Do **not** rebuild map tools here. Builder: tap-to-see-who chip + 30s soft-lock + map like/dislike/report (cache **v=27**). Profile social ladder is **?v=28**.
+
+## Social credit levels
+
+Levels come from **likes received** on the user’s stamped actions (`feature.userId || feature.by`).
+
+| Level | Likes received |
+|-------|----------------|
+| L1 | 0–999 |
+| L2 | 1,000–4,999 |
+| L3 | 5,000+ |
+
+**Report routing:** reporter `level >= 3` → auto-delete eligible (`canAutoDeleteReport`); below L3 → review board. Board voters v1 = any signed-in user / has `userId` (`isBoardVoter`).
+
+**Feature reaction shape** (Builder-locked; one entry per voter; toggle removes):
+
+```js
+likes: [{ by: userId, at: ms }]
+dislikes: [{ by, at }]
+reports: [{ by, at }]
+modVotes: [{ by, at, vote: 'keep'|'delete' }]
+```
+
+Profile also syncs `state.likes = [{ id, featureId, targetUserId, by, at }]` in slim MQTT state (`mergeById`). `likesReceived` counts unique `by|featureId` from feature `likes[]` plus the registry.
+
+**Stamps:** `byName = displayName() || googleName() || emailLocalPart || 'Operator'`. After Google sign-in, empty display name is seeded from Google name, then email local-part.
 
 
 ## Google Sign-In

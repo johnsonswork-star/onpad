@@ -203,6 +203,10 @@
       if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
       else localStorage.removeItem('onpad:googlePicture');
       if (!displayName() && payload.name) setDisplayName(payload.name);
+      if (!displayName() && payload.email) {
+        const local = String(payload.email).split('@')[0].replace(/\s+/g, ' ').trim().slice(0, 32);
+        if (local) setDisplayName(local);
+      }
       localStorage.setItem('onpad:profileReady', '1');
     } catch (e) { /* quota / private mode */ }
     publishLocalProfile();
@@ -357,7 +361,7 @@
     const id = localUserId();
     obj.by = id;
     obj.userId = id;
-    obj.byName = displayName() || googleName() || '';
+    obj.byName = stampByName();
     obj.byRole = role || '';
     obj.stampedAt = Date.now();
     return obj;
@@ -388,6 +392,23 @@
       else localStorage.removeItem('onpad:displayName');
     } catch (e) { /* quota / private mode */ }
     return v;
+  }
+  function emailLocalPart() {
+    const em = googleEmail();
+    if (!em) return '';
+    const at = em.indexOf('@');
+    return (at >= 0 ? em.slice(0, at) : em).replace(/\s+/g, ' ').trim().slice(0, 32);
+  }
+  /* Prefer display → Google name → email local-part; 'Operator' last resort for stamps. */
+  function stampByName() {
+    return displayName() || googleName() || emailLocalPart() || 'Operator';
+  }
+  function ensureDisplayNameSeeded() {
+    if (displayName()) return displayName();
+    if (googleName()) return setDisplayName(googleName());
+    const local = emailLocalPart();
+    if (local) return setDisplayName(local);
+    return '';
   }
   function truncUserId(id) {
     if (!id) return '';
@@ -882,37 +903,120 @@
     }
   };
 
-  /* Global API for App Builder (map tap-chip + 30s soft-lock). Settings owns progress UI. */
+  /* ---- Social credit (Profile owns ladder; Builder owns map like/report UI). ----
+     Feature reaction shape (Builder-locked):
+       likes: [{ by, at }], dislikes: [{ by, at }], reports: [{ by, at }],
+       modVotes: [{ by, at, vote: 'keep'|'delete' }]
+     One entry per voter; Builder toggle removes. Profile also keeps state.likes registry. */
+  const LEVEL_L2_MIN = 1000;
+  const LEVEL_L3_MIN = 5000;
+
+  function featureBags() {
+    return [state.surfaces, state.requests, state.digPads, state.fleet, state.paths];
+  }
+  function findFeatureById(featureId) {
+    if (!featureId) return null;
+    let found = null;
+    featureBags().forEach((arr) => {
+      (arr || []).forEach((f) => { if (f && f.id === featureId) found = f; });
+    });
+    return found;
+  }
+  function ensureReactionArrays(f) {
+    if (!f || typeof f !== 'object') return f;
+    if (!Array.isArray(f.likes)) f.likes = [];
+    if (!Array.isArray(f.dislikes)) f.dislikes = [];
+    if (!Array.isArray(f.reports)) f.reports = [];
+    if (!Array.isArray(f.modVotes)) f.modVotes = [];
+    return f;
+  }
+  function ensureLikesRegistry() {
+    if (!Array.isArray(state.likes)) state.likes = [];
+    return state.likes;
+  }
+  /* Unique like events on target's stamps: unique by+featureId (feature.likes + registry). */
+  function accountLikesReceived(userId) {
+    if (!userId) return 0;
+    const keys = new Set();
+    featureBags().forEach((arr) => {
+      (arr || []).forEach((f) => {
+        if (!f) return;
+        const owner = f.userId || f.by;
+        if (owner !== userId) return;
+        const fid = f.id || '';
+        (f.likes || []).forEach((L) => {
+          if (L && L.by) keys.add(String(L.by) + '|' + fid);
+        });
+      });
+    });
+    (state.likes || []).forEach((L) => {
+      if (!L || L.targetUserId !== userId || !L.by) return;
+      keys.add(String(L.by) + '|' + String(L.featureId || ''));
+    });
+    return keys.size;
+  }
+  function accountLevel(userId) {
+    const n = accountLikesReceived(userId);
+    if (n >= LEVEL_L3_MIN) return 3;
+    if (n >= LEVEL_L2_MIN) return 2;
+    return 1;
+  }
+  /* Idempotent per caller by + featureId. Writes registry + denormalized feature.likes. */
+  function accountRecordLike(featureId, targetUserId) {
+    const by = localUserId();
+    if (!by || !featureId) return false;
+    const likes = ensureLikesRegistry();
+    if (likes.some((L) => L && L.featureId === featureId && L.by === by)) return true;
+    const feat = findFeatureById(featureId);
+    const target = targetUserId || (feat ? (feat.userId || feat.by || '') : '') || '';
+    const at = Date.now();
+    likes.push({ id: 'like-' + uid(), featureId, targetUserId: target, by, at });
+    if (feat) {
+      ensureReactionArrays(feat);
+      if (!feat.likes.some((L) => L && L.by === by)) feat.likes.push({ by, at });
+      feat.u = Math.max(feat.u || 0, at);
+    }
+    /* Keep Builder stub counters in sync for older clients */
+    try {
+      if (target) {
+        const k = 'onpad:likesReceived:' + target;
+        localStorage.setItem(k, String(accountLikesReceived(target)));
+      }
+      localStorage.setItem('onpad:likeSeen:' + featureId + ':' + by, '1');
+    } catch (e) {}
+    persist();
+    try { updateSocialCreditUi(); } catch (e) {}
+    return true;
+  }
+  function updateSocialCreditUi() {
+    const el = document.getElementById('socialCreditLevel');
+    if (!el) return;
+    const id = localUserId();
+    const n = accountLikesReceived(id);
+    const lv = accountLevel(id);
+    el.textContent = 'Level L' + lv + ' · ' + n + ' likes';
+    el.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
+  }
+
+  /* Global API for App Builder (map tap-chip + soft-lock + social credit). Settings owns progress UI. */
   window.OnPadAccount = {
     userId: () => localUserId(),
-    profile: () => ({ userId: localUserId(), name: displayName() || googleName() || '', role }),
+    profile: () => ({ userId: localUserId(), name: displayName() || googleName() || emailLocalPart() || '', role }),
     stamp: (obj) => stampCore(obj),
     lookup: (userId) => lookupProfile(userId),
     profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
     signedIn: () => googleSignedIn(),
     signOut: () => signOutGoogle(),
-    myLevel: () => stubLevel(localUserId()),
-    level: (userId) => stubLevel(userId),
-    getLevel: () => stubLevel(localUserId()),
-    likesReceived: (userId) => {
-      try { return parseInt(localStorage.getItem('onpad:likesReceived:' + (userId || localUserId())) || '0', 10) || 0; }
-      catch (e) { return 0; }
-    },
-    recordLike: (featureId, targetUserId) => {
-      try {
-        const oid = targetUserId || '';
-        if (!oid || !featureId) return;
-        const seenK = 'onpad:likeSeen:' + featureId + ':' + localUserId();
-        if (localStorage.getItem(seenK) === '1') return;
-        localStorage.setItem(seenK, '1');
-        const k = 'onpad:likesReceived:' + oid;
-        const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1;
-        localStorage.setItem(k, String(n));
-      } catch (e) {}
-    },
-    canAutoDeleteReport: (reporterId) => stubLevel(reporterId || localUserId()) >= 3,
-    isBoardVoter: (userId) => googleSignedIn() || !!(userId || localUserId()),
-    get STAMP_LOCK_MS() { return STAMP_LOCK_MS; }
+    likesReceived: (userId) => accountLikesReceived(userId),
+    level: (userId) => accountLevel(userId),
+    myLevel: () => accountLevel(localUserId()),
+    getLevel: () => accountLevel(localUserId()),
+    recordLike: (featureId, targetUserId) => accountRecordLike(featureId, targetUserId),
+    canAutoDeleteReport: (reporterId) => accountLevel(reporterId || localUserId()) >= 3,
+    isBoardVoter: (userId) => googleSignedIn() || !!(userId && String(userId)),
+    get STAMP_LOCK_MS() { return STAMP_LOCK_MS; },
+    get LEVEL_L2_MIN() { return LEVEL_L2_MIN; },
+    get LEVEL_L3_MIN() { return LEVEL_L3_MIN; }
   };
 
   function rectCorners(s) {
@@ -968,6 +1072,7 @@
       digPads: [],
       fleet: [],
       paths: [],
+      likes: [],
       stakeDraft: { pins: [], u: 0 },
       machines: {},
       profiles: {},
@@ -997,6 +1102,7 @@
         if (s && s.v === VERSION) {
           if (!Array.isArray(s.fleet)) s.fleet = [];
           if (!Array.isArray(s.paths)) s.paths = [];
+          if (!Array.isArray(s.likes)) s.likes = [];
           if (!s.profiles || typeof s.profiles !== 'object') s.profiles = {};
           return s;
         }
@@ -1014,6 +1120,7 @@
       digPads: state.digPads,
       fleet: state.fleet || [],
       paths: state.paths || [],
+      likes: state.likes || [],
       stakeDraft: state.stakeDraft,
       machines: state.machines,
       profiles: state.profiles || {},
@@ -1054,6 +1161,7 @@
     state.digPads = mergeById(state.digPads, remote.digPads);
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
     state.paths = mergeById(state.paths || [], remote.paths || []);
+    state.likes = mergeById(state.likes || [], remote.likes || []);
     state.profiles = mergeProfiles(state.profiles || {}, remote.profiles || {});
     rebindPathDraft();
     const ru = (remote.stakeDraft && remote.stakeDraft.u) || 0;
@@ -1271,6 +1379,8 @@
     }
     syncGoogleAuthUi();
     updateProfileProgress();
+    ensureDisplayNameSeeded();
+    updateSocialCreditUi();
   }
   function applyRole(next) {
     if (!isKnownRole(next)) return;
@@ -1630,7 +1740,7 @@
     const tmp = stamp({});
     r.claimedBy = tmp.userId || tmp.by || '';
     r.byClaimed = r.claimedBy;
-    r.claimedByName = (tmp.byName || displayName() || googleName() || '').trim();
+    r.claimedByName = (tmp.byName || stampByName()).trim();
     r.claimedByRole = tmp.byRole || role || '';
     r.claimedAt = tmp.stampedAt || Date.now();
     r.u = now();
@@ -2599,7 +2709,9 @@
     if (continueBtn) {
       continueBtn.addEventListener('click', () => {
         if (nameInput) setDisplayName(nameInput.value);
-        if (!displayName() && !googleName()) {
+        ensureDisplayNameSeeded();
+        if (nameInput && !nameInput.value) nameInput.value = displayName();
+        if (!displayName() && !googleName() && !emailLocalPart()) {
           ui.toast('Add your name so claims show who you are');
         }
         markProfileReady();
@@ -2660,6 +2772,7 @@
     pathDraft = null;
     if (!Array.isArray(state.fleet)) state.fleet = [];
     if (!Array.isArray(state.paths)) state.paths = [];
+    if (!Array.isArray(state.likes)) state.likes = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
     machineMarkers = {};
     accCircle = null;
@@ -2712,8 +2825,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v27').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=27')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v28').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=28')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -2731,9 +2844,12 @@
       bootFromUrl();
       localUserId(); /* mint anon id; Google sub preferred when signed in */
       if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
+      if (!Array.isArray(state.likes)) state.likes = [];
+      ensureDisplayNameSeeded();
       publishLocalProfile();
       persist();
       updateProfileProgress();
+      updateSocialCreditUi();
       ui.job();
       ui.role();
       initMap();
