@@ -1230,26 +1230,87 @@
     try { ui.toast('Mod removed'); } catch (e) {}
     return true;
   }
-  /* Nearby users fed by Builder map bounds (all signed-in may see list). */
+  /* Nearby / LIVE presence rows fed by Builder (all signed-in may see list).
+     Builder ?v=34+ may send {userId, byName, byRole/role, lat, lng, t} for live peers. */
   let nearbyUsers = [];
+  let presenceHints = Object.create(null); /* userId → {userId, name, role, lat, lng, t} */
   let viewingUserId = null; /* null = own editable profile */
+
+  function cachePresenceHint(row) {
+    if (!row || typeof row !== 'object') return null;
+    const userId = String(row.userId || '').trim();
+    if (!userId) return null;
+    const name = String(row.name || row.byName || '').trim().slice(0, 80);
+    const role = String(row.role || row.byRole || '').trim().slice(0, 40);
+    const lat = typeof row.lat === 'number' ? row.lat : null;
+    const lng = typeof row.lng === 'number' ? row.lng : null;
+    const t = typeof row.t === 'number' ? row.t : Date.now();
+    const prev = presenceHints[userId];
+    const next = {
+      userId: userId,
+      name: name || (prev && prev.name) || '',
+      role: role || (prev && prev.role) || '',
+      lat: lat != null ? lat : (prev ? prev.lat : null),
+      lng: lng != null ? lng : (prev ? prev.lng : null),
+      t: t
+    };
+    presenceHints[userId] = next;
+    return next;
+  }
 
   function setNearbyUsers(rows) {
     nearbyUsers = [];
     (Array.isArray(rows) ? rows : []).forEach((r) => {
       if (!r || typeof r !== 'object') return;
-      const userId = String(r.userId || '').trim();
-      if (!userId) return;
+      const hint = cachePresenceHint(r);
+      if (!hint) return;
       nearbyUsers.push({
-        userId: userId,
-        name: String(r.name || '').slice(0, 80),
-        role: String(r.role || '').slice(0, 40),
-        lat: typeof r.lat === 'number' ? r.lat : null,
-        lng: typeof r.lng === 'number' ? r.lng : null
+        userId: hint.userId,
+        name: hint.name,
+        role: hint.role,
+        lat: hint.lat,
+        lng: hint.lng
       });
     });
     try { syncNearbyUsersUi(); } catch (e) {}
     return nearbyUsers.slice();
+  }
+
+  /* Resolve display name for a userId: profiles → presence hint → nearby → stamp byName → trunc id. */
+  function resolveProfileDisplay(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return { name: '', role: '', roleLabel: '' };
+    const reg = (state.profiles && state.profiles[id]) || null;
+    const hint = presenceHints[id] || null;
+    const near = nearbyUsers.find((u) => u.userId === id) || null;
+    let name = String((reg && reg.name) || '').trim()
+      || String((hint && hint.name) || '').trim()
+      || String((near && near.name) || '').trim();
+    let role = String((reg && reg.role) || '').trim()
+      || String((hint && hint.role) || '').trim()
+      || String((near && near.role) || '').trim();
+    if (!name || !role) {
+      /* stamp byName / byRole from newest feature owned by id (skip empty profiles registry) */
+      let best = null;
+      featureBags().forEach((arr) => {
+        (arr || []).forEach((f) => {
+          if (!f) return;
+          const fid = f.userId || f.by;
+          if (fid !== id) return;
+          const t = f.stampedAt || f.u || 0;
+          if (!best || t >= (best.t || 0)) {
+            best = { name: f.byName || '', role: f.byRole || '', t: t };
+          }
+        });
+      });
+      if (best) {
+        if (!name && best.name) name = String(best.name).trim();
+        if (!role && best.role) role = String(best.role).trim();
+      }
+    }
+    if (!name) name = truncUserId(id);
+    const roleLabel = role ? (ROLE_LABEL[role] || role) : '';
+    return { name: name, role: role, roleLabel: roleLabel };
   }
 
   /* Mods-only: grant n likes for featureId→target. Idempotent per featureId+target (no double-count). */
@@ -1311,8 +1372,17 @@
     return googleSignedIn();
   }
 
-  function openProfile(userId) {
-    const id = String(userId || '').trim() || localUserId();
+  /* openProfile(userId) or openProfile({userId, name?, byName?, role?, byRole?, lat?, lng?, t?}).
+     String form is enough when setNearbyUsers already cached LIVE presence hints. */
+  function openProfile(userIdOrHint) {
+    let id = '';
+    if (userIdOrHint && typeof userIdOrHint === 'object') {
+      cachePresenceHint(userIdOrHint);
+      id = String(userIdOrHint.userId || '').trim();
+    } else {
+      id = String(userIdOrHint || '').trim();
+    }
+    if (!id) id = localUserId();
     if (!id) return false;
     if (!canOpenProfile(id)) return false;
     /* Missing unknown remote with no profile/nearby/self hint still opens (read-only stub). */
@@ -1355,20 +1425,18 @@
     if (viewCard) {
       viewCard.hidden = !viewingOther;
       if (viewingOther) {
-        const p = lookupProfile(viewingUserId) || {};
-        const near = nearbyUsers.find((u) => u.userId === viewingUserId);
-        const name = (p && p.name) || (near && near.name) || profileLabel(viewingUserId) || truncUserId(viewingUserId);
-        const roleTxt = (p && p.role) || (near && near.role) || '';
+        const disp = resolveProfileDisplay(viewingUserId);
         const likes = accountLikesReceived(viewingUserId);
+        const dislikes = accountDislikesReceived(viewingUserId);
         const lv = accountLevel(viewingUserId);
         const nameEl = document.getElementById('viewedProfileName');
         const roleEl = document.getElementById('viewedProfileRole');
         const levelEl = document.getElementById('viewedProfileLevel');
         const idEl = document.getElementById('viewedProfileId');
-        if (nameEl) nameEl.textContent = name;
-        if (roleEl) roleEl.textContent = roleTxt ? ('Role · ' + roleTxt) : 'Role · —';
+        if (nameEl) nameEl.textContent = disp.name;
+        if (roleEl) roleEl.textContent = disp.roleLabel ? ('Role · ' + disp.roleLabel) : 'Role · —';
         if (levelEl) {
-          levelEl.textContent = 'Level L' + lv + ' · ' + likes + ' likes';
+          levelEl.textContent = 'Level L' + lv + ' · ' + likes + ' likes · ' + dislikes + ' dislikes';
           levelEl.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
         }
         if (idEl) {
@@ -1411,7 +1479,8 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'fat nearby-user-btn';
-      const label = (u.name || truncUserId(u.userId)) + (u.role ? (' · ' + u.role) : '');
+      const roleDisp = u.role ? (ROLE_LABEL[u.role] || u.role) : '';
+      const label = (u.name || truncUserId(u.userId)) + (roleDisp ? (' · ' + roleDisp) : '');
       btn.textContent = label;
       btn.setAttribute('title', u.userId);
       btn.addEventListener('click', () => { openProfile(u.userId); });
@@ -1513,6 +1582,23 @@
     });
     return keys.size;
   }
+  /* Unique dislike events on target's stamps: unique by+featureId from feature.dislikes[]. */
+  function accountDislikesReceived(userId) {
+    if (!userId) return 0;
+    const keys = new Set();
+    featureBags().forEach((arr) => {
+      (arr || []).forEach((f) => {
+        if (!f) return;
+        const owner = f.userId || f.by;
+        if (owner !== userId) return;
+        const fid = f.id || '';
+        (f.dislikes || []).forEach((D) => {
+          if (D && D.by) keys.add(String(D.by) + '|' + fid);
+        });
+      });
+    });
+    return keys.size;
+  }
   function accountLevel(userId) {
     const n = accountLikesReceived(userId);
     if (n >= LEVEL_L3_MIN) return 3;
@@ -1551,8 +1637,9 @@
     if (!el) return;
     const id = localUserId();
     const n = accountLikesReceived(id);
+    const d = accountDislikesReceived(id);
     const lv = accountLevel(id);
-    el.textContent = 'Level L' + lv + ' · ' + n + ' likes';
+    el.textContent = 'Level L' + lv + ' · ' + n + ' likes · ' + d + ' dislikes';
     el.setAttribute('title', 'L1 0–999 · L2 1,000–4,999 · L3 5,000+ likes received');
   }
 
@@ -1566,6 +1653,7 @@
     signedIn: () => googleSignedIn(),
     signOut: () => signOutGoogle(),
     likesReceived: (userId) => accountLikesReceived(userId),
+    dislikesReceived: (userId) => accountDislikesReceived(userId),
     level: (userId) => accountLevel(userId),
     myLevel: () => accountLevel(localUserId()),
     getLevel: () => accountLevel(localUserId()),
@@ -1579,7 +1667,7 @@
     removeMod: (userIdOrEmail) => removeMod(userIdOrEmail),
     listMods: () => listMods(),
     grantLikes: (featureId, targetUserId, n) => grantLikes(featureId, targetUserId, n),
-    openProfile: (userId) => openProfile(userId),
+    openProfile: (userIdOrHint) => openProfile(userIdOrHint),
     setNearbyUsers: (rows) => setNearbyUsers(rows),
     get STAMP_LOCK_MS() { return STAMP_LOCK_MS; },
     get LEVEL_L2_MIN() { return LEVEL_L2_MIN; },
@@ -3510,8 +3598,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v34').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=34')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v35').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=35')).catch(() => {});
   }
 
   function showBootError(msg) {
