@@ -1,7 +1,7 @@
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 
-Last updated: 2026-09-06 (FINAL: all Flags→L3 queue; mods-only auto-decide; L3 reporters never auto-remove)
+Last updated: 2026-09-06 (no auto-spawn on switch; Take over / Place new; Flag queue final)
 
 ---
 
@@ -48,28 +48,38 @@ Confirm role → shift starts.
 
 ## 2. Live, park, end shift
 
-Park and end shift are different.
+**Chris rule (2026-09-06):** Clock-in / Switch role is **operator shift state only** — it does **not** place a machine by itself.
+
+### Operate a machine (explicit)
+To run equipment you must either:
+- **Take over** an existing logged machine on the map (same role type), or
+- **Place new machine** when a real unit isn’t logged yet (intentional, named).
 
 ### Park machine (stay on shift)
-Use when one person runs many roles.
-
-- Drop a parked unit at current location.
-- Operator stays live and may pick another role.
+- Parks **only** the machine you are currently operating (if any).
+- Does **not** spawn a new unit.
+- Operator stays live and may Switch role.
 - Parked unit has no live pulse.
 - Label: `Water Truck 1 · parked` plus owner name.
 
+### Switch role
+- Changes shift role / live label only.
+- Does **not** auto-create equipment.
+- If you were operating a machine that doesn’t match the new role, it is parked first.
+
 ### End shift
-- Park the current machine at current location (if not already parked).
+- Park current operated machine **if any**.
 - Hide live location.
 - Operator leaves the map.
 - Parked machines stay.
 
 ### Multi-role example
-1. Pick Water truck → go live.
-2. Park water truck.
-3. Pick Excavator → live marker switches.
-4. Park excavator.
-5. End shift → operator hidden, both machines remain parked.
+1. Start shift as Water truck → live as operator (no machine spawned).
+2. Take over `Water Truck 1` (or Place new).
+3. Park → `Water Truck 1` stays on map.
+4. Switch role → Excavator (no spawn).
+5. Take over / Place excavator → operate.
+6. End shift → park current if any; operator hidden.
 
 ### What others see
 
@@ -77,6 +87,7 @@ Use when one person runs many roles.
 |-----------------|--------------------------------|-----------------|
 | No role         | Nothing                        | No              |
 | On shift        | Live marker for current role   | Yes             |
+| Operating unit  | Live operator; unit not double-pinned | Yes      |
 | Parked machine  | Static equipment pin           | No              |
 | Shift ended     | Parked machines only           | No              |
 
@@ -295,9 +306,13 @@ Clock-in sheet:
 
 On shift bar:
 
-- `Park machine`
-- `Switch role`
+- `Park machine` (only if operating)
+- `Switch role` (no spawn)
 - `End shift`
+
+Object / fleet sheet:
+
+- `Take over` (same role type, on shift)
 
 Park confirm:
 
@@ -345,8 +360,9 @@ Mod bar:
 
 - Cannot edit map before picking a role.
 - Live pin appears only after start shift.
-- Park leaves machine, operator can switch role.
-- End shift hides operator and leaves machine.
+- Switch role does not spawn a machine.
+- Park only parks the operated machine (Take over / Place new first).
+- End shift hides operator; parks current operated machine if any.
 - Tap truck opens like/dislike, not profile.
 - Tap name opens profile.
 - Object sheet has three primary buttons only.

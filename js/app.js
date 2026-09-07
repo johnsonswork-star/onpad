@@ -247,6 +247,7 @@
       setOnShift(false);
       clearSelfPresence(false);
     }
+    try { clearOperatingMachine(); } catch (eOp) {}
     publishLocalProfile();
     syncProfileSheet();
     persist();
@@ -392,27 +393,83 @@
     return changed;
   }
 
+  /* Operating a logged machine is separate from shift role (Chris 2026-09-06).
+     Clock-in / Switch role never spawn fleet. Park/End only park if operating. */
+  const OPERATING_KEY = 'onpad:operatingMachineId';
+  function getOperatingMachineId() {
+    try { return localStorage.getItem(OPERATING_KEY) || ''; } catch (e) { return ''; }
+  }
+  function setOperatingMachineId(id) {
+    try {
+      if (id) localStorage.setItem(OPERATING_KEY, String(id));
+      else localStorage.removeItem(OPERATING_KEY);
+    } catch (e) {}
+  }
+  function getOperatingMachine() {
+    const id = getOperatingMachineId();
+    if (!id || !state.fleet) return null;
+    return state.fleet.find((f) => f && !f.gone && f.id === id) || null;
+  }
+  function clearOperatingMachine() {
+    const cur = getOperatingMachine();
+    if (cur) {
+      cur.inUse = false;
+      cur.operatedBy = '';
+    }
+    setOperatingMachineId('');
+  }
+
   function parkCurrentMachine(opts) {
     opts = opts || {};
+    const item = getOperatingMachine();
+    if (!item) {
+      if (!opts.silent) ui.toast('Not operating a machine — Take over or Place new first');
+      return null;
+    }
     const pos = PositionSource.getLatLng();
     if (!pos) {
       if (!opts.silent) ui.toast('No GPS yet — cannot park');
       return null;
     }
-    if (!state.fleet) state.fleet = [];
-    const roleKey = opts.role || role;
-    const label = ROLE_LABEL[roleKey] || roleKey || 'Machine';
-    const item = stamp({
-      id: uid(),
-      role: roleKey,
-      name: label,
-      parked: true,
-      lat: pos.lat,
-      lng: pos.lng,
-      u: now()
-    });
-    state.fleet.push(item);
+    item.lat = pos.lat;
+    item.lng = pos.lng;
+    item.parked = true;
+    item.inUse = false;
+    item.operatedBy = '';
+    item.u = now();
+    setOperatingMachineId('');
     return item;
+  }
+
+  function takeOverMachine(item) {
+    if (!item || item.gone) return false;
+    if (!canEditMap()) {
+      ui.toast('Clock in first');
+      return false;
+    }
+    if (!isMachineRole(role)) {
+      ui.toast('Switch to a machine role to take over');
+      return false;
+    }
+    if (item.role && item.role !== role) {
+      ui.toast('Switch role to ' + (ROLE_LABEL[item.role] || item.role) + ' first');
+      return false;
+    }
+    const prev = getOperatingMachine();
+    if (prev && prev.id !== item.id) {
+      /* Park previous unit at last GPS before taking another */
+      parkCurrentMachine({ silent: true });
+    }
+    item.parked = false;
+    item.inUse = true;
+    item.operatedBy = currentUserId() || '';
+    item.u = now();
+    setOperatingMachineId(item.id);
+    writeLocalPresence(PositionSource.getLatLng());
+    persist();
+    select({ kind: 'fleet', id: item.id });
+    ui.toast('Operating · ' + (item.name || ROLE_LABEL[item.role] || item.role));
+    return true;
   }
 
   function startShift(pickedRole) {
@@ -425,6 +482,8 @@
     try { localStorage.setItem('onpad:role', role); } catch (e) {}
     setOnShift(true);
     clockInPick = role;
+    /* Shift only — do not spawn a machine */
+    clearOperatingMachine();
     const sheet = document.getElementById('clockInSheet');
     if (sheet) {
       sheet.dataset.switchMode = '';
@@ -437,7 +496,10 @@
     persist();
     ui.role();
     syncClockInGate();
-    ui.toast('Shift started · ' + (ROLE_LABEL[role] || role));
+    const tip = isMachineRole(role)
+      ? ('Shift started · ' + (ROLE_LABEL[role] || role) + ' — Take over a logged machine or Place new')
+      : ('Shift started · ' + (ROLE_LABEL[role] || role));
+    ui.toast(tip);
   }
 
   function openSwitchRole() {
@@ -481,6 +543,13 @@
       ui.toast('Pick a role');
       return;
     }
+    /* Never spawn on switch. If operating a machine that doesn't match new role, park it. */
+    const op = getOperatingMachine();
+    if (op && op.role && op.role !== r) {
+      parkCurrentMachine({ silent: true });
+    } else if (op && !isMachineRole(r)) {
+      parkCurrentMachine({ silent: true });
+    }
     role = r;
     try { localStorage.setItem('onpad:role', role); } catch (e) {}
     closeSwitchRoleSheet();
@@ -490,25 +559,33 @@
     persist();
     ui.role();
     syncClockInGate();
-    ui.toast('Now · ' + (ROLE_LABEL[role] || role));
+    ui.toast('Now · ' + (ROLE_LABEL[role] || role) + (isMachineRole(role) ? ' — Take over or Place new' : ''));
   }
 
   function parkMachineStayOnShift() {
     if (!canEditMap()) return;
+    if (!getOperatingMachine()) {
+      ui.toast('Not operating a machine — Take over or Place new first');
+      return;
+    }
     if (!window.confirm('Park here and stay on shift?')) return;
     const item = parkCurrentMachine();
     if (!item) return;
     persist();
-    ui.toast((ROLE_LABEL[role] || role) + ' parked — switch role when ready');
+    try { drawFleet(); } catch (e) {}
+    ui.toast((item.name || ROLE_LABEL[item.role] || 'Machine') + ' parked');
   }
 
   function endShift() {
     if (!isOnShift()) return;
-    if (!window.confirm('Park current machine and hide my location?')) return;
-    if (isMachineRole(role)) {
-      parkCurrentMachine({ silent: true });
-    }
+    const op = getOperatingMachine();
+    const msg = op
+      ? 'Park current machine and hide my location?'
+      : 'End shift and hide my location?';
+    if (!window.confirm(msg)) return;
+    if (op) parkCurrentMachine({ silent: true });
     setOnShift(false);
+    clearOperatingMachine();
     clearSelfPresence(false);
     placeTool = null;
     pathDraft = null;
@@ -1846,7 +1923,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=43: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=44: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -3781,9 +3858,18 @@
       u: now()
     });
     state.fleet.push(item);
+    /* Place new = intentional logged unit; start operating it */
+    if (isOnShift() && isMachineRole(role) && kind === role) {
+      item.parked = false;
+      item.inUse = true;
+      item.operatedBy = currentUserId() || '';
+      setOperatingMachineId(item.id);
+    } else {
+      item.parked = true;
+    }
     persist();
     select({ kind: 'fleet', id: item.id });
-    ui.toast(name + ' last-known set — drag to move');
+    ui.toast(item.inUse ? (name + ' — now operating') : (name + ' logged · parked'));
   }
 
   function presenceDisplayName(m) {
@@ -3828,8 +3914,11 @@
     if (!layers || !layers.fleet) return;
     if (editLock) return; /* don't rebuild mid-drag from MQTT/renderAll — causes snap-back */
     layers.fleet.clearLayers();
+    const opId = getOperatingMachineId();
     (state.fleet || []).forEach((f) => {
       if (f.gone || f.lat == null) return;
+      /* While I operate this unit, live GPS marker is me — don't also show parked pin */
+      if (opId && f.id === opId && f.inUse) return;
       const on = selected && selected.kind === 'fleet' && selected.id === f.id;
       /* Last-known stays until moved — always allow drag to update location */
       const m = L.marker([f.lat, f.lng], {
@@ -4064,8 +4153,13 @@
       const f = findById(state.fleet || [], sel.id);
       if (!f) { bar.hidden = true; return; }
       const machineName = (f.name || ROLE_LABEL[f.role] || f.role || 'Machine').toUpperCase();
+      const opId = getOperatingMachineId();
+      const status = (opId === f.id && f.inUse) ? ' · OPERATING' : (f.parked ? ' · PARKED' : ' · LOGGED');
       meta.innerHTML = roleSvg(f.role) +
-        metaWithPlacer('<span>' + machineName + ' · LAST KNOWN</span>', f);
+        metaWithPlacer('<span>' + machineName + status + '</span>', f);
+      if (canEditMap() && isMachineRole(role) && f.role === role && !(opId === f.id && f.inUse)) {
+        acts.appendChild(actBtn('Take over', 'claim', () => takeOverMachine(f)));
+      }
       appendSocialActions(acts, state.fleet, f);
       appendKillOrLock(acts, f, () => removeItem(state.fleet, f));
     } else if (sel.kind === 'machine') {
@@ -4580,8 +4674,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v43').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=43')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v44').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=44')).catch(() => {});
   }
 
   function showBootError(msg) {

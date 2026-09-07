@@ -1,10 +1,10 @@
 /* OnPad service worker — only cache same-origin. Never touch map tiles. (v=39 SITE OPS scores + stealth mod tools + L3 report queue) */
-const CACHE = 'onpad-v43';
+const CACHE = 'onpad-v44';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=43',
-  './js/app.js?v=43',
+  './css/app.css?v=44',
+  './js/app.js?v=44',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
