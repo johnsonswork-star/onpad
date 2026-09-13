@@ -81,9 +81,11 @@ body.truck-open .leaflet-bottom {
   top: 0; left: 0; right: 0;
   z-index: 500;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: calc(8px + var(--safe-t)) 10px 10px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + var(--safe-t)) 10px 8px;
   background: linear-gradient(180deg, #1c1814f2 0%, #1c1814cc 70%, #1c181400 100%);
   pointer-events: none;
 }
@@ -93,9 +95,9 @@ body.truck-open .leaflet-bottom {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  min-height: 72px;
-  padding: 8px 14px;
+  width: auto;
+  min-height: 36px;
+  padding: 4px 8px;
   border: 4px solid currentColor;
   border-radius: 14px;
   background: var(--panel);
@@ -1835,7 +1837,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=47) */
+/* Layout picker + Everyday rail (?v=48) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1940,7 +1942,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=47) */
+/* Top nav strip — search / speed / directions (?v=48) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2019,7 +2021,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=47) */
+/* Purpose-aware bottom chrome (?v=48) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2034,4 +2036,124 @@ body.purpose-blank-bottom.shift-gated .rail,
 body.purpose-blank-bottom.shift-gated .tool {
   opacity: 1;
   pointer-events: auto;
+}
+
+
+/* Compact Maps-style topbar (?v=48) */
+#topbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + var(--safe-t)) 10px 8px;
+}
+.user-avatar-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid #e8a54b;
+  border-radius: 50%;
+  background: #2a241e;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.user-avatar-btn .user-avatar-img[hidden],
+.user-avatar-btn .user-avatar-fallback[hidden] { display: none !important; }
+.user-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-weight: 900;
+  color: #f5d547;
+  font-size: 0.9rem;
+}
+.nav-search-slim {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+.nav-search-slim .nav-search-input {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 18px;
+  border: 2px solid #4a4036;
+  background: #1c1814;
+  color: #f2ebe3;
+  padding: 0 14px;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.nav-more-btn {
+  flex: 0 0 auto;
+  min-width: 36px;
+  letter-spacing: 0.08em;
+}
+.nav-extra {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 10px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 2px solid #4a4036;
+  background: #2a241eee;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  pointer-events: auto;
+}
+.nav-extra[hidden] { display: none !important; }
+.identity-meta-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 42%;
+  justify-content: flex-end;
+}
+body:not(.map-open) #topbar .nav-search-slim,
+body:not(.map-open) #topbar .nav-more-btn,
+body:not(.map-open) #topbar .nav-extra {
+  display: none !important;
+}
+.channels-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid #4a4036;
+  background: #1c1814;
+}
+.channels-user-row[hidden] { display: none !important; }
+.channels-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #e8a54b;
+  flex-shrink: 0;
+}
+.channels-user-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #f2ebe3;
+}
+.channels-user-email {
+  font-size: 0.8rem;
+  color: #b9a998;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
 }

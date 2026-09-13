@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=47" />
+  <link rel="stylesheet" href="css/app.css?v=48" />
 </head>
 <body>
   <div id="app">
@@ -25,30 +25,32 @@
       <button type="button" id="endShiftBtn" class="shift-act danger">End shift</button>
     </div>
     <header id="topbar">
-      <button type="button" id="roleBtn" class="identity identity-compact role-dozer" aria-label="Profile and role">
-        <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
-        <span class="identity-copy">
-          <span id="roleLabel" class="identity-role">Dozer</span>
-        </span>
+      <button type="button" id="userAvatarBtn" class="user-avatar-btn" hidden title="Signed-in profile" aria-label="Open profile">
+        <img id="userAvatarImg" class="user-avatar-img" alt="" referrerpolicy="no-referrer" />
+        <span id="userAvatarFallback" class="user-avatar-fallback" aria-hidden="true">?</span>
       </button>
-      <div class="nav-strip" aria-label="Search and navigation">
-        <form id="navSearchForm" class="nav-search-form" action="javascript:void(0)">
-          <input id="navSearchInput" class="nav-search-input" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search address…" aria-label="Search address" />
-          <button type="submit" id="navSearchBtn" class="nav-search-btn" title="Search">Go</button>
-        </form>
-        <button type="button" id="navDirectionsBtn" class="badge nav-dir-btn" title="Directions to search or selected pin">DIR</button>
+      <form id="navSearchForm" class="nav-search-slim" action="javascript:void(0)">
+        <input id="navSearchInput" class="nav-search-input" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search maps" aria-label="Search address" />
+      </form>
+      <button type="button" id="navMoreBtn" class="badge nav-more-btn" title="Directions and speed" aria-expanded="false">···</button>
+      <div id="navExtra" class="nav-extra" hidden>
+        <button type="button" id="navDirectionsBtn" class="badge nav-dir-btn" title="Directions">DIR</button>
         <button type="button" id="navClearRouteBtn" class="badge nav-clear-btn" hidden title="Clear route">CLR</button>
         <span id="speedBadge" class="badge speed-badge" title="Speed">— mph</span>
         <span id="navEtaBadge" class="badge nav-eta-badge" hidden title="Route">—</span>
       </div>
-      <div class="identity-meta">
+      <div class="identity-meta identity-meta-compact">
+        <button type="button" id="roleBtn" class="identity identity-compact role-dozer" aria-label="Profile and role" hidden>
+          <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
+          <span class="identity-copy"><span id="roleLabel" class="identity-role">Dozer</span></span>
+        </button>
         <button type="button" id="channelsBtn" class="badge channels-btn" hidden title="Leave map / channels lobby">LEAVE</button>
         <span id="channelChip" class="badge channel-chip" hidden title="Current map">SOLO</span>
         <button type="button" id="layoutChangeBtn" class="badge layout-btn" hidden title="Change layout">LAYOUT</button>
         <span id="layoutChip" class="badge layout-chip" hidden title="Current layout">—</span>
-        <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
-        <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
-        <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view">NEARBY</button>
+        <span id="gpsBadge" class="badge gps-off" title="GPS" hidden>GPS</span>
+        <span id="syncBadge" class="badge sync-local" title="Sync" hidden>SOLO</span>
+        <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view" hidden>NEARBY</button>
         <button type="button" id="reportQueueBtn" class="badge report-queue-btn" hidden title="L3+ report review queue">REPORTS</button>
         <span id="modToolsChip" class="badge mod-tools-chip" hidden title="Mod tools active for this session">Tools on</span>
       </div>
@@ -266,9 +268,16 @@
   <!-- Map channels lobby — after Google; Solo = today's map -->
   <div id="channelsGate" class="channels-gate" hidden>
     <div class="channels-card">
+      <div class="channels-user-row" id="channelsUserRow" hidden>
+        <img id="channelsUserAvatar" class="user-avatar-img channels-user-avatar" alt="" referrerpolicy="no-referrer" />
+        <div class="channels-user-copy">
+          <div id="channelsUserName" class="channels-user-name">Signed in</div>
+          <div id="channelsUserEmail" class="channels-user-email"></div>
+        </div>
+      </div>
       <h1 class="channels-title">Channels</h1>
-      <p class="channels-copy">Shared maps for everyone. Open Solo for today’s basic map, or create/join a channel.</p>
-      <button type="button" id="channelsSoloBtn" class="fat primary">Close / Solo</button>
+      <p class="channels-copy">Pick Solo or a shared channel map. Create or join with a code.</p>
+      <button type="button" id="channelsSoloBtn" class="fat primary">Solo map</button>
       <button type="button" id="channelsCreateBtn" class="fat">Create channel</button>
       <div class="channels-join-row">
         <input id="channelJoinInput" class="channels-join-input" type="text" inputmode="text" autocomplete="off" placeholder="Join code" maxlength="12" aria-label="Channel join code" />
@@ -466,6 +475,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=47"></script>
+  <script src="js/app.js?v=48"></script>
 </body>
 </html>

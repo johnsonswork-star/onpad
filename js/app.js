@@ -210,6 +210,47 @@
   function googleName() {
     try { return (localStorage.getItem('onpad:googleName') || '').trim(); } catch (e) { return ''; }
   }
+  function googlePicture() {
+    try { return (localStorage.getItem('onpad:googlePicture') || '').trim(); } catch (e) { return ''; }
+  }
+  function syncUserAvatar() {
+    const inGoogle = googleSignedIn();
+    const pic = googlePicture();
+    const name = (displayName() || googleName() || googleEmail() || 'You').trim();
+    const initial = (name.charAt(0) || '?').toUpperCase();
+    const btn = document.getElementById('userAvatarBtn');
+    const img = document.getElementById('userAvatarImg');
+    const fb = document.getElementById('userAvatarFallback');
+    if (btn) {
+      btn.hidden = !inGoogle;
+      btn.title = inGoogle ? name : '';
+    }
+    if (img) {
+      if (inGoogle && pic) {
+        img.src = pic;
+        img.hidden = false;
+        img.alt = name;
+      } else {
+        img.removeAttribute('src');
+        img.hidden = true;
+      }
+    }
+    if (fb) {
+      fb.textContent = initial;
+      fb.hidden = !!(inGoogle && pic);
+    }
+    const row = document.getElementById('channelsUserRow');
+    const cImg = document.getElementById('channelsUserAvatar');
+    const cName = document.getElementById('channelsUserName');
+    const cEm = document.getElementById('channelsUserEmail');
+    if (row) row.hidden = !inGoogle;
+    if (cImg) {
+      if (inGoogle && pic) { cImg.src = pic; cImg.hidden = false; }
+      else { cImg.removeAttribute('src'); cImg.hidden = true; }
+    }
+    if (cName) cName.textContent = name;
+    if (cEm) cEm.textContent = googleEmail() || '';
+  }
   function googleEmail() {
     try { return (localStorage.getItem('onpad:googleEmail') || '').trim(); } catch (e) { return ''; }
   }
@@ -271,6 +312,11 @@
       } catch (e) {}
       if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
       else localStorage.removeItem('onpad:googlePicture');
+      mapMode = 'lobby';
+      activeChannelId = '';
+      activeLayoutId = '';
+      try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (eLm) {}
+      try { syncUserAvatar(); } catch (eAv) {}
       if (!displayName() && payload.name) setDisplayName(payload.name);
       if (!displayName() && payload.email) {
         const local = String(payload.email).split('@')[0].replace(/\s+/g, ' ').trim().slice(0, 32);
@@ -457,6 +503,7 @@
     try { renderLeftChannelLists(); } catch (eLc) {}
     if (showLobby) {
       try { closeSheet('clockInSheet'); } catch (e) {}
+      try { syncUserAvatar(); } catch (eAv) {}
       renderChannelsList();
     }
   }
@@ -651,26 +698,13 @@
     retopic();
   }
   function restoreMapMode() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
-      if (!saved || !saved.mode) {
-        mapMode = 'lobby';
-        return;
-      }
-      if (saved.mode === 'solo') {
-        mapMode = 'solo';
-        activeChannelId = '';
-        activeSite = SOLO_SITE;
-        return;
-      }
-      if (saved.mode === 'channel' && saved.id) {
-        mapMode = 'channel';
-        activeChannelId = String(saved.id).toUpperCase();
-        activeSite = channelRoomCode(activeChannelId);
-        return;
-      }
-    } catch (e) {}
+    /* Cold open / refresh always Channels lobby (Chris ?v=48).
+       Deep link ?ch= still handled in bootFromUrl. */
     mapMode = 'lobby';
+    activeChannelId = '';
+    activeSite = SOLO_SITE;
+    activeLayoutId = '';
+    try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (e) {}
   }
   function getLayout() {
     return LAYOUT_PRESETS[activeLayoutId] || null;
@@ -921,7 +955,11 @@
         map.setView([hit.lat, hit.lng], Math.max(map.getZoom(), 15));
         L.popup().setLatLng([hit.lat, hit.lng]).setContent(escHtml(hit.label)).openOn(map);
       }
-      ui.toast('Found — tap DIR for directions');
+      ui.toast('Found — open ··· then DIR');
+      const extra = document.getElementById('navExtra');
+      const more = document.getElementById('navMoreBtn');
+      if (extra) extra.removeAttribute('hidden');
+      if (more) more.setAttribute('aria-expanded', 'true');
       const clr = document.getElementById('navClearRouteBtn');
       if (clr) clr.hidden = false;
     } catch (e) {
@@ -980,6 +1018,8 @@
     const allowShift = channelAllowsShiftBottom();
     document.body.classList.toggle('map-solo', solo && isMapOpen());
     document.body.classList.toggle('purpose-blank-bottom', isMapOpen() && !solo && !allowShift);
+    const roleBtn = document.getElementById('roleBtn');
+    if (roleBtn) roleBtn.hidden = !(isMapOpen() && allowShift);
     const truck = document.getElementById('truckBar');
     if (truck) {
       truck.hidden = !(isMapOpen() && allowShift);
@@ -1299,6 +1339,7 @@
       chip.setAttribute('title', em ? (n + ' <' + em + '>') : n);
     }
     syncGoogleFallback();
+    try { syncUserAvatar(); } catch (eAv) {}
     if (!inGoogle) initGoogleSignIn(false);
   }
 
@@ -2603,7 +2644,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=47: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=48: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5379,10 +5420,28 @@
       e.preventDefault();
       runAddressSearch();
     });
+    const moreBtn = document.getElementById('navMoreBtn');
+    const navExtra = document.getElementById('navExtra');
+    if (moreBtn && navExtra) {
+      moreBtn.addEventListener('click', () => {
+        const open = navExtra.hasAttribute('hidden');
+        if (open) navExtra.removeAttribute('hidden');
+        else navExtra.setAttribute('hidden', '');
+        moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    }
     const dirBtn = document.getElementById('navDirectionsBtn');
     if (dirBtn) dirBtn.addEventListener('click', () => runDirections());
     const clrBtn = document.getElementById('navClearRouteBtn');
     if (clrBtn) clrBtn.addEventListener('click', () => clearRoute());
+    const avBtn = document.getElementById('userAvatarBtn');
+    if (avBtn) avBtn.addEventListener('click', () => {
+      const id = currentUserId();
+      if (id) openUserProfile(id);
+      else {
+        try { document.getElementById('roleBtn').click(); } catch (e) {}
+      }
+    });
     ['leftSoloBtn', 'leftSoloBtnEx'].forEach((id) => {
       const b = document.getElementById(id);
       if (b) b.addEventListener('click', () => enterSolo());
@@ -5500,8 +5559,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v47').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=47')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v48').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=48')).catch(() => {});
   }
 
   function showBootError(msg) {
