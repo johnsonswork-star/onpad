@@ -430,6 +430,7 @@
       if (channels) channels.hidden = true;
       document.body.classList.remove('channels-gated', 'map-open');
       googleBtnRendered = false;
+      try { syncUserAvatar(); } catch (eAv) {}
       requestAnimationFrame(() => {
         requestAnimationFrame(() => initGoogleSignIn(true));
       });
@@ -437,6 +438,7 @@
       return;
     }
     /* Signed in: map open (Solo/channel) or lobby if user opened CHANNELS */
+    try { syncUserAvatar(); } catch (eAv) {}
     syncChannelsGate();
     if (isMapOpen()) ensureLayoutOrPicker();
     else {
@@ -518,9 +520,9 @@
       back.textContent = mapMode === 'channel' ? 'LEAVE' : 'CHANNELS';
     }
     try { renderLeftChannelLists(); } catch (eLc) {}
+    try { syncUserAvatar(); } catch (eAv) {}
     if (showLobby) {
       try { closeSheet('clockInSheet'); } catch (e) {}
-      try { syncUserAvatar(); } catch (eAv) {}
       renderChannelsList();
     }
   }
@@ -715,7 +717,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=49: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=51: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -2680,7 +2682,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=49: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=51: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5595,8 +5597,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v49').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=49')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v51').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=51')).catch(() => {});
   }
 
   function showBootError(msg) {
@@ -5626,6 +5628,7 @@
       bind();
       renderAll();
       syncAuthGate();
+      try { syncUserAvatar(); } catch (eAv) {}
       try { syncReportQueueUi(); } catch (eRq) {}
       PositionSource.on(onPos);
       PositionSource.startPhoneGps();
