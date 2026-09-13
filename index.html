@@ -41,6 +41,7 @@
       </div>
       <div class="identity-meta identity-meta-compact">
         <button type="button" id="roleBtn" class="identity identity-compact role-dozer" aria-label="Profile and role" hidden>
+          <img id="identityAvatar" class="identity-avatar" alt="" width="40" height="40" hidden referrerpolicy="no-referrer" decoding="async" />
           <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
           <span class="identity-copy"><span id="roleLabel" class="identity-role">Dozer</span></span>
         </button>
@@ -329,7 +330,7 @@
   <!-- Profile sheet — same entry as role (#roleBtn). No second nav. -->
   <div id="roleSheet" class="sheet" hidden>
     <div class="sheet-card">
-      <h2 class="profile-sheet-title">Profile <span id="profileRoleBadge" class="profile-role-badge" hidden></span></h2>
+      <h2 class="profile-sheet-title"><img id="profileAvatar" class="profile-avatar" alt="" width="40" height="40" hidden referrerpolicy="no-referrer" decoding="async" /> Profile <span id="profileRoleBadge" class="profile-role-badge" hidden></span></h2>
 
       <!-- Score first (own + openProfile) — SITE_OPS §6 -->
       <div id="profileScoreHeader" class="profile-score-header" aria-live="polite">
@@ -428,7 +429,10 @@
       </select>
       <div class="profile-stub">
         <button type="button" id="continueAsBtn" class="fat primary">Continue as dozer operator</button>
-        <span id="userIdChip" class="userid-chip" title="Account id"></span>
+        <div class="userid-chip-row">
+          <img id="userIdAvatar" class="profile-avatar profile-avatar-sm" alt="" width="36" height="36" hidden referrerpolicy="no-referrer" decoding="async" />
+          <span id="userIdChip" class="userid-chip" title="Account id"></span>
+        </div>
       </div>
       <p class="hint profile-hint">Sign in with Google is required. Add your name so claims show who you are. Tap Continue after you set role and name.</p>
       </div>
