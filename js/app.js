@@ -720,7 +720,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=51: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=52: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -2685,7 +2685,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=51: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=52: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5638,8 +5638,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v51').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=51')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v52').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=52')).catch(() => {});
   }
 
   function showBootError(msg) {

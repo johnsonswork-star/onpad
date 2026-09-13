@@ -1883,7 +1883,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=51) */
+/* Layout picker + Everyday rail (?v=52) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1988,7 +1988,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=51) */
+/* Top nav strip — search / speed / directions (?v=52) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2067,7 +2067,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=51) */
+/* Purpose-aware bottom chrome (?v=52) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2085,7 +2085,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=51) */
+/* Compact Maps-style topbar (?v=52) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
