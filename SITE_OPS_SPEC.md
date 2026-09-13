@@ -1,20 +1,36 @@
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 
-Last updated: 2026-09-06 (no auto-spawn on switch; Take over / Place new; Flag queue final)
+Last updated: 2026-09-13 (map channels v1 — Discord-style shared maps)
 
 ---
 
 ## Goal
 
-A live job-site map where:
+Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, scores, mods, presence, and object sheets on solo and channel maps.
 
-- You cannot change the map until you pick a role.
-- A role is a sub-profile for this shift (the machine you are running).
+- After Google Sign-In → **Channels** screen (list / create / join).
+- **Close / Solo** → today’s basic solo map (SITE room).
+- Open a channel → shared map for that channel (LIVE scoped per channel).
+- Tip pins, meetup times, photos, games: later (not v1).
+- You cannot change the map until you pick a role (clock-in).
+- A role is a sub-profile for this shift.
 - Likes and dislikes define the person.
 - Object taps rate the object. Name taps open profile.
 - Mods look like normal players until they turn tools on.
-- Flag / report: all reports → L3+ swipe review queue; only mods auto-decide (instant remove/punish).
+- Flag / report: all reports → L3+ swipe review queue; only mods auto-decide.
+
+---
+
+## 0. Channels (v1)
+
+- Channel model: `id` (short code) + `name` + `members` (creator + joiners).
+- Create → mint code, add self as member, open that map room (`CH-{id}` MQTT / localStorage).
+- Join by code → add self, open room.
+- List = channels this device knows (local directory).
+- Solo map uses the existing SITE room (today’s ?v=44 experience).
+- CHANNELS control on the map returns to the lobby without signing out.
+- Deep link: `?ch=CODE`.
 
 ---
 

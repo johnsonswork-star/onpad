@@ -1257,6 +1257,101 @@ body.auth-gated #app {
 }
 body.auth-gated #authGate { pointer-events: auto; }
 
+.channels-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgba(12, 10, 8, 0.92);
+  padding: calc(16px + var(--safe-t)) 16px calc(16px + var(--safe-b));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.channels-gate[hidden] { display: none !important; }
+.channels-card {
+  width: min(420px, 100%);
+  margin: auto;
+  background: #2a241e;
+  border: 2px solid #4a4036;
+  border-radius: 18px;
+  padding: 22px 18px 20px;
+  color: #f2ebe3;
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
+}
+.channels-title {
+  margin: 0 0 8px;
+  font-size: 1.7rem;
+  letter-spacing: 0.02em;
+}
+.channels-copy {
+  margin: 0 0 16px;
+  color: #cfc4b6;
+  line-height: 1.35;
+  font-size: 0.95rem;
+}
+.channels-card .fat { width: 100%; margin-bottom: 10px; }
+.channels-join-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.channels-join-input {
+  min-height: var(--touch);
+  border-radius: 12px;
+  border: 2px solid #5a4f44;
+  background: #1c1814;
+  color: #f2ebe3;
+  padding: 0 12px;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.channels-list-label {
+  margin: 4px 0 8px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #b9ao98;
+  color: #b9a998;
+}
+.channels-list { display: flex; flex-direction: column; gap: 8px; }
+.channels-empty { margin: 0; }
+.channel-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  min-height: var(--touch);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid #4a4036;
+  background: #1c1814;
+  color: #f2ebe3;
+  cursor: pointer;
+}
+.channel-row:active { border-color: #e8a54b; }
+.channel-row-name { font-weight: 700; font-size: 1.05rem; }
+.channel-row-meta { font-size: 0.8rem; color: #b9a998; letter-spacing: 0.04em; }
+.channels-btn, .channel-chip {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+body.channels-gated #app {
+  pointer-events: none;
+  filter: blur(1px);
+}
+body.channels-gated #channelsGate { pointer-events: auto; }
+body.channels-gated .rail,
+body.channels-gated #truckBar,
+body.channels-gated #shiftBar,
+body.channels-gated #clockInSheet { display: none !important; }
+
+
 
 /* Social credit controls */
 .act.social { background: #2a241c; color: var(--safety); border-color: #5a4a30; font-size: 13px; min-width: 40px; }

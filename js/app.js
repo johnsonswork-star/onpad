@@ -3,7 +3,13 @@
   'use strict';
 
   const VERSION = 1;
-  const SHARED_SITE = 'SITE'; /* one shared live room for the Pages URL — no job codes */
+  const SOLO_SITE = 'SITE'; /* Close/Solo = today's shared solo map */
+  let activeSite = SOLO_SITE;
+  let mapMode = 'lobby'; /* lobby | solo | channel */
+  let activeChannelId = '';
+  const CHANNELS_KEY = 'onpad:channels';
+  const MAP_MODE_KEY = 'onpad:mapMode';
+
   const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const M_PER_DEG = 111320;
   const FT_PER_M = 3.28084;
@@ -296,19 +302,255 @@
 
   function syncAuthGate() {
     const gate = document.getElementById('authGate');
+    const channels = document.getElementById('channelsGate');
     const inGoogle = googleSignedIn();
     if (gate) gate.hidden = inGoogle;
     document.body.classList.toggle('auth-gated', !inGoogle);
     if (!inGoogle) {
+      mapMode = 'lobby';
+      activeChannelId = '';
       try { closeSheet('roleSheet'); } catch (e) { /* ignore */ }
       try { closeSheet('clockInSheet'); } catch (e2) { /* ignore */ }
+      if (channels) channels.hidden = true;
+      document.body.classList.remove('channels-gated', 'map-open');
       googleBtnRendered = false;
-      /* Unhide first, then GIS renderButton so host width is real on phones. */
       requestAnimationFrame(() => {
         requestAnimationFrame(() => initGoogleSignIn(true));
       });
+      syncClockInGate();
+      return;
     }
+    /* Signed in: lobby until Solo or a channel is opened */
+    syncChannelsGate();
     syncClockInGate();
+  }
+
+  function loadChannelDir() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CHANNELS_KEY) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+  }
+  function saveChannelDir(list) {
+    try { localStorage.setItem(CHANNELS_KEY, JSON.stringify(list || [])); } catch (e) {}
+  }
+  function channelRoomCode(id) {
+    return 'CH-' + String(id || '').toUpperCase();
+  }
+  function findChannel(id) {
+    const want = String(id || '').toUpperCase();
+    return loadChannelDir().find((c) => c && String(c.id).toUpperCase() === want) || null;
+  }
+  function upsertChannel(ch) {
+    if (!ch || !ch.id) return;
+    const list = loadChannelDir();
+    const id = String(ch.id).toUpperCase();
+    const i = list.findIndex((c) => c && String(c.id).toUpperCase() === id);
+    ch.id = id;
+    if (i >= 0) list[i] = Object.assign({}, list[i], ch);
+    else list.unshift(ch);
+    saveChannelDir(list);
+  }
+  function addSelfToChannel(ch) {
+    if (!ch) return ch;
+    const me = currentUserId();
+    if (!me) return ch;
+    if (!Array.isArray(ch.members)) ch.members = [];
+    if (!ch.members.some((m) => m && m.id === me)) {
+      ch.members.push({
+        id: me,
+        name: (displayName() || googleName() || '').trim() || me.slice(0, 8)
+      });
+    }
+    return ch;
+  }
+  function mintChannelId() {
+    let id = '';
+    for (let n = 0; n < 6; n++) id += CHARSET[Math.floor(Math.random() * CHARSET.length)];
+    return id;
+  }
+  function isMapOpen() {
+    return mapMode === 'solo' || mapMode === 'channel';
+  }
+  function syncChannelsGate() {
+    const channels = document.getElementById('channelsGate');
+    const inGoogle = googleSignedIn();
+    const showLobby = inGoogle && mapMode === 'lobby';
+    if (channels) channels.hidden = !showLobby;
+    document.body.classList.toggle('channels-gated', !!showLobby);
+    document.body.classList.toggle('map-open', inGoogle && isMapOpen());
+    const chip = document.getElementById('channelChip');
+    if (chip) {
+      if (mapMode === 'channel' && activeChannelId) {
+        const ch = findChannel(activeChannelId);
+        chip.hidden = false;
+        chip.textContent = (ch && ch.name) ? ch.name : activeChannelId;
+      } else if (mapMode === 'solo') {
+        chip.hidden = false;
+        chip.textContent = 'SOLO';
+      } else {
+        chip.hidden = true;
+      }
+    }
+    const back = document.getElementById('channelsBtn');
+    if (back) back.hidden = !(inGoogle && isMapOpen());
+    if (showLobby) {
+      try { closeSheet('clockInSheet'); } catch (e) {}
+      renderChannelsList();
+    }
+  }
+  function renderChannelsList() {
+    const host = document.getElementById('channelsList');
+    if (!host) return;
+    host.innerHTML = '';
+    const list = loadChannelDir();
+    if (!list.length) {
+      const empty = document.createElement('p');
+      empty.className = 'hint channels-empty';
+      empty.textContent = 'No channels yet — create one or join with a code.';
+      host.appendChild(empty);
+      return;
+    }
+    list.forEach((ch) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'channel-row';
+      const title = document.createElement('span');
+      title.className = 'channel-row-name';
+      title.textContent = ch.name || ch.id;
+      const meta = document.createElement('span');
+      meta.className = 'channel-row-meta';
+      const n = (ch.members && ch.members.length) || 1;
+      meta.textContent = ch.id + ' · ' + n + (n === 1 ? ' member' : ' members');
+      row.appendChild(title);
+      row.appendChild(meta);
+      row.addEventListener('click', () => enterChannel(ch.id));
+      host.appendChild(row);
+    });
+  }
+  function enterSolo() {
+    if (!googleSignedIn()) return;
+    mapMode = 'solo';
+    activeChannelId = '';
+    activeSite = SOLO_SITE;
+    try {
+      localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'solo' }));
+    } catch (e) {}
+    switchToActiveSite();
+    syncChannelsGate();
+    syncClockInGate();
+    ui.toast('Solo map');
+  }
+  function enterChannel(id) {
+    if (!googleSignedIn()) return;
+    const code = String(id || '').trim().toUpperCase().replace(/^CH-/, '');
+    if (!code || code.length < 4) {
+      ui.toast('Enter a channel code');
+      return;
+    }
+    let ch = findChannel(code);
+    if (!ch) {
+      ch = {
+        id: code,
+        name: 'Channel ' + code,
+        createdBy: '',
+        members: [],
+        createdAt: Date.now()
+      };
+    }
+    addSelfToChannel(ch);
+    upsertChannel(ch);
+    mapMode = 'channel';
+    activeChannelId = ch.id;
+    activeSite = channelRoomCode(ch.id);
+    try {
+      localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'channel', id: ch.id }));
+    } catch (e) {}
+    switchToActiveSite();
+    syncChannelsGate();
+    syncClockInGate();
+    ui.toast('Joined · ' + (ch.name || ch.id));
+  }
+  function createChannel() {
+    if (!googleSignedIn()) return;
+    let name = '';
+    try {
+      name = (window.prompt('Channel name', 'My map') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    } catch (e) { name = ''; }
+    if (!name) {
+      ui.toast('Name required');
+      return;
+    }
+    const id = mintChannelId();
+    const me = currentUserId();
+    const ch = {
+      id: id,
+      name: name,
+      createdBy: me || '',
+      members: [],
+      createdAt: Date.now()
+    };
+    addSelfToChannel(ch);
+    upsertChannel(ch);
+    enterChannel(id);
+    ui.toast('Created · code ' + id + ' — share to invite');
+  }
+  function joinChannelFromForm() {
+    const input = document.getElementById('channelJoinInput');
+    const raw = input ? String(input.value || '').trim() : '';
+    enterChannel(raw);
+  }
+  function openChannelsLobby() {
+    if (!googleSignedIn()) {
+      syncAuthGate();
+      return;
+    }
+    /* Leaving map — clear presence from current room */
+    try { clearSelfPresence(true); } catch (e) {}
+    mapMode = 'lobby';
+    activeChannelId = '';
+    try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (e) {}
+    syncChannelsGate();
+    syncClockInGate();
+  }
+  function switchToActiveSite() {
+    persist();
+    state = loadJob(activeSite, emptyState(activeSite));
+    state.job = activeSite;
+    if (!Array.isArray(state.paths)) state.paths = [];
+    if (!Array.isArray(state.likes)) state.likes = [];
+    if (!Array.isArray(state.mods)) state.mods = [];
+    if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
+    if (!state.restrictions || typeof state.restrictions !== 'object') state.restrictions = {};
+    if (!Array.isArray(state.reportQueue)) state.reportQueue = [];
+    selected = null;
+    placeTool = null;
+    pathDraft = null;
+    persist();
+    try { renderAll(); } catch (e) {}
+    retopic();
+  }
+  function restoreMapMode() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
+      if (!saved || !saved.mode) {
+        mapMode = 'lobby';
+        return;
+      }
+      if (saved.mode === 'solo') {
+        mapMode = 'solo';
+        activeChannelId = '';
+        activeSite = SOLO_SITE;
+        return;
+      }
+      if (saved.mode === 'channel' && saved.id) {
+        mapMode = 'channel';
+        activeChannelId = String(saved.id).toUpperCase();
+        activeSite = channelRoomCode(activeChannelId);
+        return;
+      }
+    } catch (e) {}
+    mapMode = 'lobby';
   }
 
   function syncClockInGate() {
@@ -316,7 +558,7 @@
     const bar = document.getElementById('shiftBar');
     const inGoogle = googleSignedIn();
     const on = isOnShift();
-    const needClockIn = inGoogle && !on;
+    const needClockIn = inGoogle && isMapOpen() && !on;
     document.body.classList.toggle('shift-gated', needClockIn);
     document.body.classList.toggle('on-shift', !!(inGoogle && on));
     if (sheet) {
@@ -328,7 +570,8 @@
         sheet.hidden = true;
       }
     }
-    if (bar) bar.hidden = !(inGoogle && on);
+    if (bar) bar.hidden = !(inGoogle && isMapOpen() && on);
+    if (!isMapOpen() && sheet) sheet.hidden = true;
     if (!canEditMap() && placeTool) {
       placeTool = null;
       try { ui.tools(); } catch (e) {}
@@ -1923,7 +2166,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=44: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=45: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -2614,7 +2857,7 @@
   }
 
   /* state */
-  let state = emptyState(SHARED_SITE);
+  let state = emptyState(SOLO_SITE);
   let role = localStorage.getItem('onpad:role') || 'dozer';
   if (!isKnownRole(role)) role = 'dozer';
   let placeTool = null;
@@ -2634,7 +2877,7 @@
   function emptyState(code) {
     return {
       v: VERSION,
-      job: code || SHARED_SITE,
+      job: code || activeSite,
       surfaces: [],
       requests: [],
       digPads: [],
@@ -2655,10 +2898,10 @@
 
   function persist() {
     state.u = now();
-    state.job = SHARED_SITE;
+    state.job = activeSite;
     try {
-      localStorage.setItem(storageKey(SHARED_SITE), JSON.stringify(state));
-      localStorage.setItem('onpad:activeJob', SHARED_SITE);
+      localStorage.setItem(storageKey(activeSite), JSON.stringify(state));
+      localStorage.setItem('onpad:activeJob', activeSite);
       localStorage.setItem('onpad:role', role);
     } catch (e) { /* quota */ }
     schedulePub();
@@ -2688,7 +2931,7 @@
   function slimState() {
     return {
       v: state.v,
-      job: SHARED_SITE,
+      job: activeSite,
       surfaces: state.surfaces,
       requests: state.requests,
       digPads: state.digPads,
@@ -2732,7 +2975,7 @@
   function applyRemote(remote) {
     if (!remote || remote.v !== VERSION) return;
     applyingRemote = true;
-    state.job = SHARED_SITE;
+    state.job = activeSite;
     state.surfaces = mergeById(state.surfaces, remote.surfaces);
     state.requests = mergeById(state.requests, remote.requests);
     state.digPads = mergeById(state.digPads, remote.digPads);
@@ -2790,7 +3033,7 @@
   }
 
   /* MQTT sync — public brokers; shared site room (hidden). No API keys. */
-  function topic() { return 'onpad/v1/' + SHARED_SITE; }
+  function topic() { return 'onpad/v1/' + activeSite; }
   function schedulePub() {
     if (applyingRemote) return;
     clearTimeout(pubTimer);
@@ -3108,7 +3351,7 @@
     });
     map.on('zoomend', () => { try { pushNearbyUsers(); } catch (e) {} });
 
-    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet', 'reportQueueSheet'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet', 'reportQueueSheet', 'channelsGate'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -3975,8 +4218,8 @@
   }
 
   function writeLocalPresence(pos) {
-    /* Live presence only while on shift (any role). Pedestrian = not published. */
-    if (!pos || !isOnShift() || !googleSignedIn()) {
+    /* Live presence only on an open map while on shift. Lobby = not published. */
+    if (!pos || !isMapOpen() || !isOnShift() || !googleSignedIn()) {
       clearSelfPresence(false);
       return;
     }
@@ -4589,6 +4832,18 @@
     if (googleFb) googleFb.addEventListener('click', promptGoogleSignIn);
     const authGateFb = document.getElementById('authGateGoogleFallback');
     if (authGateFb) authGateFb.addEventListener('click', promptGoogleSignIn);
+    const soloBtn = document.getElementById('channelsSoloBtn');
+    if (soloBtn) soloBtn.addEventListener('click', () => enterSolo());
+    const createBtn = document.getElementById('channelsCreateBtn');
+    if (createBtn) createBtn.addEventListener('click', () => createChannel());
+    const joinBtn = document.getElementById('channelsJoinBtn');
+    if (joinBtn) joinBtn.addEventListener('click', () => joinChannelFromForm());
+    const joinInput = document.getElementById('channelJoinInput');
+    if (joinInput) joinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') joinChannelFromForm();
+    });
+    const channelsBtn = document.getElementById('channelsBtn');
+    if (channelsBtn) channelsBtn.addEventListener('click', () => openChannelsLobby());
     initGoogleSignIn(false);
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
@@ -4608,7 +4863,7 @@
   function switchJob(code, factory) {
     persist();
     state = factory ? factory(code) : loadJob(code, emptyState(code));
-    state.job = code || SHARED_SITE;
+    state.job = code || activeSite;
     selected = null;
     placeTool = null;
     pathDraft = null;
@@ -4629,13 +4884,26 @@
   }
 
   function bootFromUrl() {
-    /* Open site: everyone on this Pages URL shares one pad (SITE).
-       Job codes are gone — MQTT room stays hidden behind SHARED_SITE. */
+    restoreMapMode();
     const u = new URL(location.href);
     const hash = (u.hash || '').replace(/^#/, '');
     let snap = null;
     if (hash.startsWith('s=')) snap = decodeSnap(hash.slice(2));
-    const code = SHARED_SITE;
+    /* ?ch=CODE deep-link into a channel */
+    const chParam = (u.searchParams.get('ch') || '').trim().toUpperCase();
+    if (chParam && googleSignedIn()) {
+      mapMode = 'channel';
+      activeChannelId = chParam.replace(/^CH-/, '');
+      activeSite = channelRoomCode(activeChannelId);
+      let ch = findChannel(activeChannelId);
+      if (!ch) {
+        ch = { id: activeChannelId, name: 'Channel ' + activeChannelId, createdBy: '', members: [], createdAt: Date.now() };
+      }
+      addSelfToChannel(ch);
+      upsertChannel(ch);
+      try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'channel', id: activeChannelId })); } catch (e) {}
+    }
+    const code = activeSite;
     state = loadJob(code, emptyState(code));
     state.job = code;
     if (!Array.isArray(state.paths)) state.paths = [];
@@ -4674,8 +4942,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v44').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=44')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v45').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=45')).catch(() => {});
   }
 
   function showBootError(msg) {

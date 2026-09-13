@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=44" />
+  <link rel="stylesheet" href="css/app.css?v=45" />
 </head>
 <body>
   <div id="app">
@@ -34,6 +34,8 @@
         </span>
       </button>
       <div class="identity-meta">
+        <button type="button" id="channelsBtn" class="badge channels-btn" hidden title="Map channels">CHANNELS</button>
+        <span id="channelChip" class="badge channel-chip" hidden title="Current map">SOLO</span>
         <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
         <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
         <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view">NEARBY</button>
@@ -229,6 +231,22 @@
     </div>
   </div>
 
+  <!-- Map channels lobby — after Google; Solo = today's map -->
+  <div id="channelsGate" class="channels-gate" hidden>
+    <div class="channels-card">
+      <h1 class="channels-title">Channels</h1>
+      <p class="channels-copy">Shared maps for everyone. Open Solo for today’s basic map, or create/join a channel.</p>
+      <button type="button" id="channelsSoloBtn" class="fat primary">Close / Solo</button>
+      <button type="button" id="channelsCreateBtn" class="fat">Create channel</button>
+      <div class="channels-join-row">
+        <input id="channelJoinInput" class="channels-join-input" type="text" inputmode="text" autocomplete="off" placeholder="Join code" maxlength="12" aria-label="Channel join code" />
+        <button type="button" id="channelsJoinBtn" class="fat">Join</button>
+      </div>
+      <h2 class="channels-list-label">Your channels</h2>
+      <div id="channelsList" class="channels-list" role="list"></div>
+    </div>
+  </div>
+
 
   <!-- P4 L3+ Tinder-style report review queue -->
   <div id="reportQueueSheet" class="sheet report-queue-sheet" hidden>
@@ -408,6 +426,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=44"></script>
+  <script src="js/app.js?v=45"></script>
 </body>
 </html>
