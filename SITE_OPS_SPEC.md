@@ -47,6 +47,9 @@ Tool registry + layout presets so new pin types are additive. Channel custom lay
 - Channel LIVE presence is scoped to `CH-{id}` only; LEAVE/CHANNELS drops presence.
 - Top bar: address search (Nominatim) + driving directions (OSRM) + speed.
 - Left rail: Discord-style channel switch + layout tools.
+- **Solo = no bottom bar** (no Park/Switch/End / truck paths).
+- Channel **purpose at create** locks layout + bottom chrome (Excavation → shift+truck; Everyday → blank bottom).
+- Bottom HUD clears Safari chrome via `--bottom-ui` (safe-area + browser chrome pad).
 
 ---
 

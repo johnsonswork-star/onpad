@@ -31,6 +31,9 @@
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+  /* Extra clearance for mobile Safari floating URL/toolbar chrome */
+  --browser-chrome-b: 56px;
+  --bottom-ui: calc(var(--safe-b) + var(--browser-chrome-b));
   --topbar-h: 96px;
   --rail-w: 92px;
   --touch: 68px;
@@ -213,7 +216,7 @@ body.truck-open .leaflet-bottom {
 .rail {
   position: absolute;
   top: calc(var(--topbar-h) + var(--safe-t));
-  bottom: calc(56px + var(--safe-b));
+  bottom: calc(56px + var(--bottom-ui));
   z-index: 500;
   display: flex;
   pointer-events: none;
@@ -725,7 +728,8 @@ button:active { transform: translateY(1px); }
 }
 .truck-bar {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
+  left: 0; right: 0;
+  bottom: var(--browser-chrome-b);
   z-index: 510;
   display: flex;
   flex-direction: column;
@@ -1623,7 +1627,8 @@ button.placer-chip {
 .shift-bar {
   position: fixed;
   left: 8px; right: 8px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  /* Sit above truck handle + Safari chrome */
+  bottom: calc(var(--truck-handle-h, 58px) + 10px + var(--bottom-ui));
   z-index: 2200;
   display: flex;
   gap: 8px;
@@ -1830,7 +1835,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=46) */
+/* Layout picker + Everyday rail (?v=47) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1935,7 +1940,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=46) */
+/* Top nav strip — search / speed / directions (?v=47) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2012,3 +2017,21 @@ body.layout-excavation #everydayRail { display: none !important; }
   background: #3a2e20;
 }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
+
+
+/* Purpose-aware bottom chrome (?v=47) */
+body.map-solo #shiftBar,
+body.map-solo #truckBar,
+body.map-solo #clockInSheet,
+body.purpose-blank-bottom #shiftBar,
+body.purpose-blank-bottom #truckBar,
+body.purpose-blank-bottom #clockInSheet {
+  display: none !important;
+}
+body.map-solo.shift-gated .rail,
+body.map-solo.shift-gated .tool,
+body.purpose-blank-bottom.shift-gated .rail,
+body.purpose-blank-bottom.shift-gated .tool {
+  opacity: 1;
+  pointer-events: auto;
+}

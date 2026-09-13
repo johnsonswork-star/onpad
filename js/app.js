@@ -482,7 +482,7 @@
       const meta = document.createElement('span');
       meta.className = 'channel-row-meta';
       const n = (ch.members && ch.members.length) || 1;
-      meta.textContent = ch.id + ' · ' + n + (n === 1 ? ' member' : ' members');
+      meta.textContent = ch.id + (ch.purpose ? (' · ' + ch.purpose) : '') + ' · ' + n + (n === 1 ? ' member' : ' members');
       row.appendChild(title);
       row.appendChild(meta);
       row.addEventListener('click', () => enterChannel(ch.id));
@@ -541,9 +541,40 @@
     } catch (e) {}
     switchToActiveSite();
     syncChannelsGate();
-    ensureLayoutOrPicker();
+    /* Purpose at create locks layout for this channel */
+    if (ch.purpose && LAYOUT_PRESETS[ch.purpose]) {
+      setActiveLayout(ch.purpose);
+      syncLayoutGate();
+      syncClockInGate();
+    } else if (!ch.purpose) {
+      /* Legacy channel — ask once and save */
+      const purpose = pickChannelPurpose();
+      if (purpose) {
+        ch.purpose = purpose;
+        upsertChannel(ch);
+        setActiveLayout(purpose);
+        syncLayoutGate();
+        syncClockInGate();
+      } else {
+        ensureLayoutOrPicker();
+      }
+    } else {
+      ensureLayoutOrPicker();
+    }
     try { renderLeftChannelLists(); } catch (e) {}
-    ui.toast('Joined · ' + (ch.name || ch.id));
+    ui.toast('Joined · ' + (ch.name || ch.id) + (ch.purpose ? (' · ' + ch.purpose) : ''));
+  }
+  function pickChannelPurpose() {
+    /* Returns excavation | everyday — required at create */
+    let raw = '';
+    try {
+      raw = (window.prompt('Channel purpose:\n1 = Everyday (places)\n2 = Excavation (Site Ops)', '1') || '').trim();
+    } catch (e) { raw = ''; }
+    if (raw === '2' || /^exc/i.test(raw)) return 'excavation';
+    if (raw === '1' || /^eve/i.test(raw) || raw === '') return 'everyday';
+    if (LAYOUT_PRESETS[raw]) return raw;
+    ui.toast('Use 1 Everyday or 2 Excavation');
+    return '';
   }
   function createChannel() {
     if (!googleSignedIn()) return;
@@ -555,19 +586,23 @@
       ui.toast('Name required');
       return;
     }
+    const purpose = pickChannelPurpose();
+    if (!purpose) return;
     const id = mintChannelId();
     const me = currentUserId();
     const ch = {
       id: id,
       name: name,
+      purpose: purpose,
       createdBy: me || '',
       members: [],
       createdAt: Date.now()
     };
     addSelfToChannel(ch);
     upsertChannel(ch);
+    try { localStorage.setItem(LAYOUT_KEY, purpose); } catch (e) {}
     enterChannel(id);
-    ui.toast('Created · code ' + id + ' — share to invite');
+    ui.toast('Created · ' + purpose + ' · code ' + id);
   }
   function joinChannelFromForm() {
     const input = document.getElementById('channelJoinInput');
@@ -708,6 +743,16 @@
     });
   }
   function openLayoutPicker() {
+    if (mapMode === 'channel' && activeChannelId) {
+      const ch = findChannel(activeChannelId);
+      if (ch && ch.purpose && LAYOUT_PRESETS[ch.purpose]) {
+        ui.toast('Channel purpose is ' + ch.purpose + ' (set at create)');
+        setActiveLayout(ch.purpose);
+        syncLayoutGate();
+        syncClockInGate();
+        return;
+      }
+    }
     activeLayoutId = '';
     try { localStorage.removeItem(LAYOUT_KEY); } catch (e) {}
     applyLayoutHud();
@@ -722,9 +767,9 @@
   }
   function ensureLayoutOrPicker() {
     if (!isMapOpen()) { syncLayoutGate(); return; }
-    const remembered = rememberedLayoutId();
-    /* Solo defaults Everyday — excavation is opt-in via LAYOUT, not Solo default */
+    /* Solo defaults Everyday — no excavation bottom bar */
     if (mapMode === 'solo') {
+      const remembered = rememberedLayoutId();
       setActiveLayout(remembered || 'everyday');
       if (!remembered) {
         try { localStorage.setItem(LAYOUT_KEY, 'everyday'); } catch (e) {}
@@ -733,6 +778,16 @@
       syncClockInGate();
       return;
     }
+    if (mapMode === 'channel' && activeChannelId) {
+      const ch = findChannel(activeChannelId);
+      if (ch && ch.purpose && LAYOUT_PRESETS[ch.purpose]) {
+        setActiveLayout(ch.purpose);
+        syncLayoutGate();
+        syncClockInGate();
+        return;
+      }
+    }
+    const remembered = rememberedLayoutId();
     if (remembered) { setActiveLayout(remembered); syncLayoutGate(); syncClockInGate(); return; }
     openLayoutPicker();
   }
@@ -912,15 +967,36 @@
     }
   }
 
+  function channelAllowsShiftBottom() {
+    /* Solo: never. Channels: only Excavation purpose/layout. */
+    if (mapMode !== 'channel') return false;
+    const lay = getLayout();
+    if (lay && lay.id === 'excavation') return true;
+    const ch = activeChannelId ? findChannel(activeChannelId) : null;
+    return !!(ch && ch.purpose === 'excavation');
+  }
+  function syncBottomChrome() {
+    const solo = mapMode === 'solo';
+    const allowShift = channelAllowsShiftBottom();
+    document.body.classList.toggle('map-solo', solo && isMapOpen());
+    document.body.classList.toggle('purpose-blank-bottom', isMapOpen() && !solo && !allowShift);
+    const truck = document.getElementById('truckBar');
+    if (truck) {
+      truck.hidden = !(isMapOpen() && allowShift);
+      if (truck.hidden) truck.classList.remove('open');
+    }
+  }
   function syncClockInGate() {
     const sheet = document.getElementById('clockInSheet');
     const bar = document.getElementById('shiftBar');
     const inGoogle = googleSignedIn();
     const on = isOnShift();
     const lay = getLayout();
-    const needClockIn = inGoogle && isMapOpen() && !!lay && lay.clockIn !== false && !on;
+    const allowShift = channelAllowsShiftBottom();
+    syncBottomChrome();
+    const needClockIn = inGoogle && isMapOpen() && allowShift && !!lay && lay.clockIn !== false && !on;
     document.body.classList.toggle('shift-gated', needClockIn);
-    document.body.classList.toggle('on-shift', !!(inGoogle && on));
+    document.body.classList.toggle('on-shift', !!(inGoogle && on && allowShift));
     if (sheet) {
       if (needClockIn) {
         sheet.hidden = false;
@@ -930,7 +1006,8 @@
         sheet.hidden = true;
       }
     }
-    if (bar) bar.hidden = !(inGoogle && isMapOpen() && on);
+    /* Solo = no bottom bar; channel excavation only when on shift */
+    if (bar) bar.hidden = !(inGoogle && allowShift && on);
     if (!isMapOpen() && sheet) sheet.hidden = true;
     if (!canEditMap() && placeTool) {
       placeTool = null;
@@ -2526,7 +2603,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=46: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=47: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5423,8 +5500,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v46').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=46')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v47').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=47')).catch(() => {});
   }
 
   function showBootError(msg) {
