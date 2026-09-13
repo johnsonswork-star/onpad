@@ -25,6 +25,54 @@
   const MACHINE_ROLES = ['dozer', 'excavator', 'water', 'haul'];
   const CREW_ROLES = ['spotter', 'qa', 'survey', 'foreman', 'geology', 'mechanic', 'trucker', 'laborer', 'fuel'];
   const CLOCK_IN_ROLES = ['dozer', 'excavator', 'water', 'haul', 'spotter', 'qa'];
+  const LAYOUT_KEY = 'onpad:layoutId';
+  const PIN_COLORS = {
+    house: '#5b8def', work: '#6b7280', friend: '#ec4899', family: '#f59e0b',
+    church: '#a78bfa', school: '#38bdf8', gym: '#ef4444', restaurant: '#f97316',
+    coffee: '#92400e', store: '#14b8a6', grocery: '#22c55e', gas: '#eab308',
+    doctor: '#0ea5e9', pharmacy: '#10b981', park: '#84cc16', trail: '#65a30d',
+    meet: '#e879f9', parking: '#64748b', other: '#a8a29e'
+  };
+  const EVERYDAY_PIN_DEFS = [
+    ['house', 'House', 'H'], ['work', 'Work', 'W'], ['friend', 'Friend', 'FR'],
+    ['family', 'Family', 'FA'], ['church', 'Church', 'CH'], ['school', 'School', 'SC'],
+    ['gym', 'Gym', 'GY'], ['restaurant', 'Restaurant', 'R'], ['coffee', 'Coffee', 'CF'],
+    ['store', 'Store', 'ST'], ['grocery', 'Grocery', 'GR'], ['gas', 'Gas', 'GS'],
+    ['doctor', 'Doctor', 'DR'], ['pharmacy', 'Pharmacy', 'PH'], ['park', 'Park', 'PK'],
+    ['trail', 'Trail', 'TR'], ['meet', 'Meet', 'M'], ['parking', 'Parking', 'P'],
+    ['other', 'Other', '?']
+  ];
+  const TOOL_REGISTRY = Object.create(null);
+  EVERYDAY_PIN_DEFS.forEach(([kind, label, letter]) => {
+    TOOL_REGISTRY['pin-' + kind] = {
+      id: 'pin-' + kind,
+      label: label,
+      letter: letter,
+      action: 'placePin',
+      pinType: kind,
+      color: PIN_COLORS[kind] || '#a8a29e',
+      group: 'everyday'
+    };
+  });
+  const LAYOUT_PRESETS = {
+    excavation: {
+      id: 'excavation',
+      name: 'Excavation',
+      blurb: 'Machines, water, paths, Site Ops',
+      hud: 'excavation',
+      clockIn: true,
+      toolIds: []
+    },
+    everyday: {
+      id: 'everyday',
+      name: 'Everyday',
+      blurb: 'House, work, friends, places',
+      hud: 'everyday',
+      clockIn: false,
+      toolIds: EVERYDAY_PIN_DEFS.map(([k]) => 'pin-' + k)
+    }
+  };
+  let activeLayoutId = '';
   const ROLES = MACHINE_ROLES.concat(CREW_ROLES);
   const ROLE_LABEL = {
     dozer: 'Dozer', excavator: 'Excavator', water: 'Water truck', haul: 'Haul truck',
@@ -63,12 +111,13 @@
     lng: null,
     accM: null,
     heading: null,
+    speedMps: null,
     t: 0,
     _watchId: null,
     _listeners: [],
     getLatLng() {
       if (this.lat == null) return null;
-      return { lat: this.lat, lng: this.lng, accM: this.accM, heading: this.heading, t: this.t };
+      return { lat: this.lat, lng: this.lng, accM: this.accM, heading: this.heading, speedMps: this.speedMps, t: this.t };
     },
     on(fn) { this._listeners.push(fn); },
     _emit() {
@@ -107,6 +156,7 @@
         this.lng = g.coords.longitude;
         this.accM = g.coords.accuracy;
         this.heading = g.coords.heading;
+        this.speedMps = (g.coords.speed != null && isFinite(g.coords.speed)) ? g.coords.speed : this.speedMps;
         this.t = Date.now();
         this._emit();
       };
@@ -297,7 +347,10 @@
     } catch (e) {}
   }
   function canEditMap() {
-    return googleSignedIn() && isOnShift();
+    if (!googleSignedIn() || !isMapOpen()) return false;
+    const lay = getLayout();
+    if (lay && lay.clockIn === false) return true;
+    return isOnShift();
   }
 
   function syncAuthGate() {
@@ -322,7 +375,11 @@
     }
     /* Signed in: lobby until Solo or a channel is opened */
     syncChannelsGate();
-    syncClockInGate();
+    if (isMapOpen()) ensureLayoutOrPicker();
+    else {
+      syncLayoutGate();
+      syncClockInGate();
+    }
   }
 
   function loadChannelDir() {
@@ -393,7 +450,11 @@
       }
     }
     const back = document.getElementById('channelsBtn');
-    if (back) back.hidden = !(inGoogle && isMapOpen());
+    if (back) {
+      back.hidden = !(inGoogle && isMapOpen());
+      back.textContent = mapMode === 'channel' ? 'LEAVE' : 'CHANNELS';
+    }
+    try { renderLeftChannelLists(); } catch (eLc) {}
     if (showLobby) {
       try { closeSheet('clockInSheet'); } catch (e) {}
       renderChannelsList();
@@ -430,15 +491,27 @@
   }
   function enterSolo() {
     if (!googleSignedIn()) return;
+    try {
+      if (mapMode === 'channel') {
+        clearSelfPresence(false);
+        persist();
+        publish();
+      }
+    } catch (e) {}
     mapMode = 'solo';
     activeChannelId = '';
     activeSite = SOLO_SITE;
     try {
       localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'solo' }));
     } catch (e) {}
+    /* Solo default layout Everyday when unset (excavation remains opt-in via LAYOUT) */
+    try {
+      if (!rememberedLayoutId()) localStorage.setItem(LAYOUT_KEY, 'everyday');
+    } catch (e2) {}
     switchToActiveSite();
     syncChannelsGate();
-    syncClockInGate();
+    ensureLayoutOrPicker();
+    try { renderLeftChannelLists(); } catch (e3) {}
     ui.toast('Solo map');
   }
   function enterChannel(id) {
@@ -468,7 +541,8 @@
     } catch (e) {}
     switchToActiveSite();
     syncChannelsGate();
-    syncClockInGate();
+    ensureLayoutOrPicker();
+    try { renderLeftChannelLists(); } catch (e) {}
     ui.toast('Joined · ' + (ch.name || ch.id));
   }
   function createChannel() {
@@ -505,19 +579,30 @@
       syncAuthGate();
       return;
     }
-    /* Leaving map — clear presence from current room */
-    try { clearSelfPresence(true); } catch (e) {}
+    /* Leave channel/solo — drop presence in current room, then lobby */
+    try {
+      clearSelfPresence(false);
+      persist();
+      publish();
+    } catch (e) {}
     mapMode = 'lobby';
     activeChannelId = '';
+    activeLayoutId = '';
+    activeSite = SOLO_SITE;
     try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (e) {}
+    applyLayoutHud();
     syncChannelsGate();
+    syncLayoutGate();
     syncClockInGate();
+    try { clearRoute(); } catch (e2) {}
+    ui.toast('Left map');
   }
   function switchToActiveSite() {
     persist();
     state = loadJob(activeSite, emptyState(activeSite));
     state.job = activeSite;
     if (!Array.isArray(state.paths)) state.paths = [];
+    if (!Array.isArray(state.pins)) state.pins = [];
     if (!Array.isArray(state.likes)) state.likes = [];
     if (!Array.isArray(state.mods)) state.mods = [];
     if (!state.profiles || typeof state.profiles !== 'object') state.profiles = {};
@@ -552,13 +637,288 @@
     } catch (e) {}
     mapMode = 'lobby';
   }
+  function getLayout() {
+    return LAYOUT_PRESETS[activeLayoutId] || null;
+  }
+  function rememberedLayoutId() {
+    try {
+      const id = (localStorage.getItem(LAYOUT_KEY) || '').trim();
+      if (id && LAYOUT_PRESETS[id]) return id;
+    } catch (e) {}
+    return '';
+  }
+  function setActiveLayout(id) {
+    if (!LAYOUT_PRESETS[id]) return false;
+    activeLayoutId = id;
+    try { localStorage.setItem(LAYOUT_KEY, id); } catch (e) {}
+    applyLayoutHud();
+    return true;
+  }
+  function applyLayoutHud() {
+    const lay = getLayout();
+    const hud = (lay && lay.hud) || '';
+    document.body.classList.toggle('layout-excavation', hud === 'excavation');
+    document.body.classList.toggle('layout-everyday', hud === 'everyday');
+    document.body.classList.toggle('layout-picked', !!lay);
+    const er = document.getElementById('everydayRail');
+    if (er) {
+      if (hud === 'everyday') er.classList.add('open');
+      else er.classList.remove('open');
+    }
+    const chip = document.getElementById('layoutChip');
+    if (chip) {
+      if (lay) { chip.hidden = false; chip.textContent = lay.name; }
+      else chip.hidden = true;
+    }
+    const changeBtn = document.getElementById('layoutChangeBtn');
+    if (changeBtn) changeBtn.hidden = !(googleSignedIn() && isMapOpen() && !!lay);
+    const gate = document.getElementById('layoutGate');
+    if (gate) gate.hidden = true;
+    document.body.classList.remove('layout-gated');
+    renderEverydayRail();
+    try { renderLeftChannelLists(); } catch (eLc) {}
+    try { ui.tools(); } catch (e) {}
+  }
+  function syncLayoutGate() {
+    const gate = document.getElementById('layoutGate');
+    const need = googleSignedIn() && isMapOpen() && !getLayout();
+    if (gate) gate.hidden = !need;
+    document.body.classList.toggle('layout-gated', !!need);
+    if (need) renderLayoutPicker();
+  }
+  function renderLayoutPicker() {
+    const host = document.getElementById('layoutList');
+    if (!host) return;
+    host.innerHTML = '';
+    Object.keys(LAYOUT_PRESETS).forEach((id) => {
+      const lay = LAYOUT_PRESETS[id];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'layout-row';
+      const title = document.createElement('span');
+      title.className = 'layout-row-name';
+      title.textContent = lay.name;
+      const meta = document.createElement('span');
+      meta.className = 'layout-row-meta';
+      meta.textContent = lay.blurb || '';
+      b.appendChild(title);
+      b.appendChild(meta);
+      b.addEventListener('click', () => pickLayout(id));
+      host.appendChild(b);
+    });
+  }
+  function openLayoutPicker() {
+    activeLayoutId = '';
+    try { localStorage.removeItem(LAYOUT_KEY); } catch (e) {}
+    applyLayoutHud();
+    syncLayoutGate();
+    syncClockInGate();
+  }
+  function pickLayout(id) {
+    if (!setActiveLayout(id)) { ui.toast('Unknown layout'); return; }
+    syncLayoutGate();
+    syncClockInGate();
+    ui.toast(LAYOUT_PRESETS[id].name + ' layout');
+  }
+  function ensureLayoutOrPicker() {
+    if (!isMapOpen()) { syncLayoutGate(); return; }
+    const remembered = rememberedLayoutId();
+    /* Solo defaults Everyday — excavation is opt-in via LAYOUT, not Solo default */
+    if (mapMode === 'solo') {
+      setActiveLayout(remembered || 'everyday');
+      if (!remembered) {
+        try { localStorage.setItem(LAYOUT_KEY, 'everyday'); } catch (e) {}
+      }
+      syncLayoutGate();
+      syncClockInGate();
+      return;
+    }
+    if (remembered) { setActiveLayout(remembered); syncLayoutGate(); syncClockInGate(); return; }
+    openLayoutPicker();
+  }
+  function renderEverydayRail() {
+    const host = document.getElementById('everydayTools');
+    if (!host) return;
+    host.innerHTML = '';
+    const lay = getLayout();
+    if (!lay || lay.hud !== 'everyday') return;
+    (lay.toolIds || []).forEach((tid) => {
+      const tool = TOOL_REGISTRY[tid];
+      if (!tool) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tool tool-pin-place';
+      b.setAttribute('data-tool', tool.id);
+      b.setAttribute('aria-label', tool.label);
+      b.innerHTML = '<span class="tool-letter" style="background:' + (tool.color || '#666') + '">' +
+        escHtml(tool.letter || '?') + '</span><span>' + escHtml(tool.label) + '</span>';
+      host.appendChild(b);
+    });
+    host.querySelectorAll('.tool[data-tool]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (!canEditMap()) {
+          ui.toast('Sign in to place');
+          return;
+        }
+        const t = b.getAttribute('data-tool');
+        placeTool = placeTool === t ? null : t;
+        ui.tools();
+        if (placeTool) ui.toast('Tap map to place');
+      });
+    });
+  }
+  function pinLabel(type) {
+    const t = TOOL_REGISTRY['pin-' + type];
+    return (t && t.label) || type || 'Place';
+  }
+  function pinLetter(type) {
+    const t = TOOL_REGISTRY['pin-' + type];
+    return (t && t.letter) || '?';
+  }
+  function pinColor(type) {
+    return PIN_COLORS[type] || '#a8a29e';
+  }
+  function pinSvg(type) {
+    return '<span class="pin-letter">' + escHtml(pinLetter(type)) + '</span>';
+  }
+  function renderLeftChannelLists() {
+    ['leftChannelList', 'leftChannelListEx'].forEach((hid) => {
+      const host = document.getElementById(hid);
+      if (!host) return;
+      host.innerHTML = '';
+      loadChannelDir().forEach((ch) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'left-channel-item' + (mapMode === 'channel' && activeChannelId === ch.id ? ' active' : '');
+        b.textContent = (ch.name || ch.id) + ' · ' + ch.id;
+        b.addEventListener('click', () => enterChannel(ch.id));
+        host.appendChild(b);
+      });
+    });
+  }
+
+  /* Nav: Nominatim geocode + OSRM route (free, no API key) */
+  let navTarget = null; /* { lat, lng, label } */
+  let routeLine = null;
+  let lastSpeedMph = null;
+  function updateSpeedBadge(pos) {
+    const el = document.getElementById('speedBadge');
+    if (!el) return;
+    let mph = null;
+    if (pos && pos.speedMps != null && isFinite(pos.speedMps) && pos.speedMps >= 0) {
+      mph = pos.speedMps * 2.23694;
+    }
+    lastSpeedMph = mph;
+    el.textContent = mph == null ? '— mph' : (Math.round(mph) + ' mph');
+  }
+  function setNavEta(text) {
+    const el = document.getElementById('navEtaBadge');
+    if (!el) return;
+    if (!text) { el.hidden = true; el.textContent = '—'; return; }
+    el.hidden = false;
+    el.textContent = text;
+  }
+  function clearRoute() {
+    navTarget = null;
+    setNavEta('');
+    const clr = document.getElementById('navClearRouteBtn');
+    if (clr) clr.hidden = true;
+    if (routeLine && map) {
+      try { map.removeLayer(routeLine); } catch (e) {}
+    }
+    routeLine = null;
+  }
+  async function geocodeAddress(q) {
+    const query = String(q || '').trim();
+    if (!query) throw new Error('Enter an address');
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Search failed');
+    const data = await res.json();
+    if (!data || !data.length) throw new Error('No results');
+    const hit = data[0];
+    return {
+      lat: parseFloat(hit.lat),
+      lng: parseFloat(hit.lon),
+      label: hit.display_name || query
+    };
+  }
+  async function routeOsrm(from, to) {
+    const url = 'https://router.project-osrm.org/route/v1/driving/' +
+      from.lng + ',' + from.lat + ';' + to.lng + ',' + to.lat +
+      '?overview=full&geometries=geojson';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Route failed');
+    const data = await res.json();
+    if (!data || data.code !== 'Ok' || !data.routes || !data.routes[0]) throw new Error('No route');
+    return data.routes[0];
+  }
+  async function runAddressSearch() {
+    const input = document.getElementById('navSearchInput');
+    const q = input ? input.value : '';
+    try {
+      ui.toast('Searching…');
+      const hit = await geocodeAddress(q);
+      navTarget = hit;
+      if (map) {
+        map.setView([hit.lat, hit.lng], Math.max(map.getZoom(), 15));
+        L.popup().setLatLng([hit.lat, hit.lng]).setContent(escHtml(hit.label)).openOn(map);
+      }
+      ui.toast('Found — tap DIR for directions');
+      const clr = document.getElementById('navClearRouteBtn');
+      if (clr) clr.hidden = false;
+    } catch (e) {
+      ui.toast((e && e.message) || 'Search failed');
+    }
+  }
+  async function runDirections() {
+    const pos = PositionSource.getLatLng();
+    if (!pos) { ui.toast('Waiting for GPS'); return; }
+    let dest = navTarget;
+    if (!dest && selected && selected.kind === 'pin') {
+      const p = findById(state.pins || [], selected.id);
+      if (p && p.lat != null) dest = { lat: p.lat, lng: p.lng, label: p.name || pinLabel(p.type) };
+    }
+    if (!dest && selected && selected.kind === 'fleet') {
+      const f = findById(state.fleet || [], selected.id);
+      if (f && f.lat != null) dest = { lat: f.lat, lng: f.lng, label: f.name || 'Pin' };
+    }
+    if (!dest) {
+      const input = document.getElementById('navSearchInput');
+      if (input && input.value.trim()) {
+        try { dest = await geocodeAddress(input.value); navTarget = dest; }
+        catch (e) { ui.toast((e && e.message) || 'Search failed'); return; }
+      }
+    }
+    if (!dest) { ui.toast('Search an address or select a pin'); return; }
+    try {
+      ui.toast('Routing…');
+      const route = await routeOsrm(pos, dest);
+      const coords = (route.geometry && route.geometry.coordinates) || [];
+      const latlngs = coords.map((c) => [c[1], c[0]]);
+      if (routeLine && map) try { map.removeLayer(routeLine); } catch (e) {}
+      routeLine = L.polyline(latlngs, { color: '#5b8def', weight: 5, opacity: 0.85 }).addTo(map);
+      try { map.fitBounds(routeLine.getBounds(), { padding: [40, 40] }); } catch (e2) {}
+      const miles = (route.distance || 0) / 1609.34;
+      const mins = Math.round((route.duration || 0) / 60);
+      setNavEta(miles.toFixed(1) + ' mi · ' + mins + ' min');
+      const clr = document.getElementById('navClearRouteBtn');
+      if (clr) clr.hidden = false;
+      ui.toast('Route ready');
+    } catch (e) {
+      ui.toast((e && e.message) || 'Route failed');
+    }
+  }
 
   function syncClockInGate() {
     const sheet = document.getElementById('clockInSheet');
     const bar = document.getElementById('shiftBar');
     const inGoogle = googleSignedIn();
     const on = isOnShift();
-    const needClockIn = inGoogle && isMapOpen() && !on;
+    const lay = getLayout();
+    const needClockIn = inGoogle && isMapOpen() && !!lay && lay.clockIn !== false && !on;
     document.body.classList.toggle('shift-gated', needClockIn);
     document.body.classList.toggle('on-shift', !!(inGoogle && on));
     if (sheet) {
@@ -1624,7 +1984,7 @@
     }
     /* Fallback: newest stamped feature fields for this id */
     let best = null;
-    const bags = [state.surfaces, state.requests, state.digPads, state.fleet, state.paths];
+    const bags = [state.surfaces, state.requests, state.digPads, state.fleet, state.pins, state.paths];
     bags.forEach((arr) => {
       (arr || []).forEach((f) => {
         if (!f) return;
@@ -2136,7 +2496,7 @@
   const LEVEL_L3_MIN = 5000;
 
   function featureBags() {
-    return [state.surfaces, state.requests, state.digPads, state.fleet, state.paths];
+    return [state.surfaces, state.requests, state.digPads, state.fleet, state.pins, state.paths];
   }
   function findFeatureById(featureId) {
     if (!featureId) return null;
@@ -2166,7 +2526,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=45: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=46: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -2882,6 +3242,7 @@
       requests: [],
       digPads: [],
       fleet: [],
+      pins: [],
       paths: [],
       likes: [],
       mods: [],
@@ -2915,6 +3276,7 @@
         const s = JSON.parse(raw);
         if (s && s.v === VERSION) {
           if (!Array.isArray(s.fleet)) s.fleet = [];
+          if (!Array.isArray(s.pins)) s.pins = [];
           if (!Array.isArray(s.paths)) s.paths = [];
           if (!Array.isArray(s.likes)) s.likes = [];
           if (!Array.isArray(s.mods)) s.mods = [];
@@ -2936,6 +3298,7 @@
       requests: state.requests,
       digPads: state.digPads,
       fleet: state.fleet || [],
+      pins: state.pins || [],
       paths: state.paths || [],
       likes: state.likes || [],
       mods: state.mods || [],
@@ -2980,6 +3343,7 @@
     state.requests = mergeById(state.requests, remote.requests);
     state.digPads = mergeById(state.digPads, remote.digPads);
     state.fleet = mergeById(state.fleet || [], remote.fleet || []);
+    state.pins = mergeById(state.pins || [], remote.pins || []);
     state.paths = mergeById(state.paths || [], remote.paths || []);
     state.likes = mergeById(state.likes || [], remote.likes || []);
     state.mods = mergeMods(state.mods || [], remote.mods || []);
@@ -3333,6 +3697,7 @@
       stake: L.layerGroup().addTo(map),
       dig: L.layerGroup().addTo(map),
       fleet: L.layerGroup().addTo(map),
+      pins: L.layerGroup().addTo(map),
       machines: L.layerGroup().addTo(map)
     };
     handleGroup = L.layerGroup().addTo(map);
@@ -3351,7 +3716,7 @@
     });
     map.on('zoomend', () => { try { pushNearbyUsers(); } catch (e) {} });
 
-    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet', 'reportQueueSheet', 'channelsGate'].forEach((id) => {
+    ['topbar', 'leftRail', 'rightRail', 'selectedBar', 'truckBar', 'shiftBar', 'clockInSheet', 'reportQueueSheet', 'channelsGate', 'layoutGate', 'everydayRail'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) L.DomEvent.disableClickPropagation(el);
     });
@@ -3389,9 +3754,17 @@
       ui.tools();
       return;
     }
-    if (placeTool === 'place-dozer' || placeTool === 'place-excavator' || placeTool === 'place-water') {
-      const kind = placeTool === 'place-excavator' ? 'excavator' : (placeTool === 'place-water' ? 'water' : 'dozer');
+    if (placeTool === 'place-dozer' || placeTool === 'place-excavator' || placeTool === 'place-water' || placeTool === 'place-haul') {
+      const kind = placeTool === 'place-excavator' ? 'excavator'
+        : (placeTool === 'place-water' ? 'water'
+          : (placeTool === 'place-haul' ? 'haul' : 'dozer'));
       placeFleet(kind, e.latlng);
+      placeTool = null;
+      ui.tools();
+      return;
+    }
+    if (placeTool && TOOL_REGISTRY[placeTool] && TOOL_REGISTRY[placeTool].action === 'placePin') {
+      placePin(TOOL_REGISTRY[placeTool].pinType, e.latlng);
       placeTool = null;
       ui.tools();
       return;
@@ -4080,6 +4453,69 @@
     });
   }
 
+  function placePin(type, latlng) {
+    if (!state.pins) state.pins = [];
+    const def = pinLabel(type);
+    let name = '';
+    try {
+      name = (window.prompt('Name this ' + def + ' (required)', def) || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    } catch (e) { name = ''; }
+    if (!name) {
+      ui.toast('Name required — not placed');
+      return;
+    }
+    const item = stamp({
+      id: uid(),
+      type: type,
+      name: name,
+      lat: latlng.lat,
+      lng: latlng.lng,
+      u: now()
+    });
+    state.pins.push(item);
+    persist();
+    select({ kind: 'pin', id: item.id });
+    ui.toast(name + ' placed');
+  }
+  function pinIcon(p, on) {
+    const type = (p && p.type) || 'other';
+    const color = pinColor(type);
+    const label = escHtml(String(p.name || pinLabel(type)));
+    return L.divIcon({
+      className: 'pin-wrap has-name',
+      iconSize: [88, 44],
+      iconAnchor: [44, 14],
+      html: '<div class="marker-stack">' +
+        '<div class="pin-body" style="background:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' +
+          '<span class="machine-glyph">' + pinSvg(type) + '</span></div>' +
+        '<div class="marker-name">' + label + '</div></div>'
+    });
+  }
+  function drawPins() {
+    if (!layers || !layers.pins) return;
+    if (editLock) return;
+    layers.pins.clearLayers();
+    (state.pins || []).forEach((p) => {
+      if (p.gone || p.lat == null) return;
+      const on = selected && selected.kind === 'pin' && selected.id === p.id;
+      const m = L.marker([p.lat, p.lng], {
+        icon: pinIcon(p, on),
+        zIndexOffset: 680,
+        draggable: true
+      }).addTo(layers.pins);
+      m.on('click', (e) => {
+        L.DomEvent.stop(e);
+        if (clickIsMarkerName(e)) {
+          const uid = p.userId || p.by || '';
+          if (uid) openUserProfile(uid);
+          return;
+        }
+        select({ kind: 'pin', id: p.id });
+      });
+      wirePixelDrag(m, () => state.pins, p.id);
+    });
+  }
+
   /* fleet — manually placed machine markers (not GPS "me") */
   function placeFleet(kind, latlng) {
     if (!state.fleet) state.fleet = [];
@@ -4218,8 +4654,13 @@
   }
 
   function writeLocalPresence(pos) {
-    /* Live presence only on an open map while on shift. Lobby = not published. */
-    if (!pos || !isMapOpen() || !isOnShift() || !googleSignedIn()) {
+    /* Channel LIVE = share location in that room only. Lobby = none.
+       Excavation still needs clock-in; Everyday publishes when signed in on map. */
+    const lay = getLayout();
+    const mayPublish = googleSignedIn() && isMapOpen() && (
+      (lay && lay.clockIn === false) || isOnShift()
+    );
+    if (!pos || !mayPublish) {
       clearSelfPresence(false);
       return;
     }
@@ -4319,6 +4760,7 @@
     drawPaths();
     drawDigPads();
     drawFleet();
+    try { drawPins(); } catch (eDp) {}
     try { drawMachines(); } catch (eDm) {}
     const bar = document.getElementById('selectedBar');
     const meta = document.getElementById('selectedMeta');
@@ -4417,6 +4859,14 @@
       const title = '<span>' + escHtml((ROLE_LABEL[roleKey] || roleKey || 'LIVE').toUpperCase()) + ' · LIVE</span>';
       meta.innerHTML = roleSvg(roleKey) + metaWithPlacer(title, m);
       appendSocialActions(acts, null, m);
+    } else if (sel.kind === 'pin') {
+      const p = findById(state.pins || [], sel.id);
+      if (!p) { bar.hidden = true; return; }
+      const title = '<span>' + escHtml((p.name || pinLabel(p.type)).toUpperCase()) + '</span>';
+      meta.innerHTML = '<span class="sheet-pin-mark" style="background:' + pinColor(p.type) + '">' +
+        escHtml(pinLetter(p.type)) + '</span>' + metaWithPlacer(title, p);
+      appendSocialActions(acts, state.pins, p);
+      appendKillOrLock(acts, p, () => removeItem(state.pins, p));
     } else if (sel.kind === 'path') {
       const p = findById(state.paths || [], sel.id);
       if (!p) { bar.hidden = true; return; }
@@ -4474,6 +4924,7 @@
     drawStake();
     drawDigPads();
     drawFleet();
+    try { drawPins(); } catch (ePins) {}
     drawMachines();
     if (selected) select(selected);
     else document.getElementById('selectedBar').hidden = true;
@@ -4844,6 +5295,35 @@
     });
     const channelsBtn = document.getElementById('channelsBtn');
     if (channelsBtn) channelsBtn.addEventListener('click', () => openChannelsLobby());
+    const layoutChangeBtn = document.getElementById('layoutChangeBtn');
+    if (layoutChangeBtn) layoutChangeBtn.addEventListener('click', () => openLayoutPicker());
+    const navForm = document.getElementById('navSearchForm');
+    if (navForm) navForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      runAddressSearch();
+    });
+    const dirBtn = document.getElementById('navDirectionsBtn');
+    if (dirBtn) dirBtn.addEventListener('click', () => runDirections());
+    const clrBtn = document.getElementById('navClearRouteBtn');
+    if (clrBtn) clrBtn.addEventListener('click', () => clearRoute());
+    ['leftSoloBtn', 'leftSoloBtnEx'].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', () => enterSolo());
+    });
+    ['leftLobbyBtn', 'leftLobbyBtnEx'].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener('click', () => openChannelsLobby());
+    });
+    const everydayHandle = document.getElementById('everydayRailHandle');
+    if (everydayHandle) everydayHandle.addEventListener('click', () => {
+      const er = document.getElementById('everydayRail');
+      if (!er) return;
+      er.classList.toggle('open');
+      const open = er.classList.contains('open');
+      everydayHandle.textContent = open ? '‹' : '›';
+      everydayHandle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { syncRailBody(); } catch (e) {}
+    });
     initGoogleSignIn(false);
     /* job/join sheets removed — open shared site */
     document.querySelectorAll('.cut-chip').forEach((b) => {
@@ -4924,6 +5404,7 @@
   }
 
   function onPos(pos) {
+    try { updateSpeedBadge(pos); } catch (eSp) {}
     ui.gps(pos);
     if (!pos) return;
     drawMachines();
@@ -4942,8 +5423,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v45').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=45')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v46').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=46')).catch(() => {});
   }
 
   function showBootError(msg) {

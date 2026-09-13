@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=45" />
+  <link rel="stylesheet" href="css/app.css?v=46" />
 </head>
 <body>
   <div id="app">
@@ -25,17 +25,27 @@
       <button type="button" id="endShiftBtn" class="shift-act danger">End shift</button>
     </div>
     <header id="topbar">
-      <button type="button" id="roleBtn" class="identity role-dozer" aria-label="Profile and role">
+      <button type="button" id="roleBtn" class="identity identity-compact role-dozer" aria-label="Profile and role">
         <span id="roleIcon" class="identity-icon" aria-hidden="true"></span>
         <span class="identity-copy">
-          <span class="identity-kicker">I'M THE</span>
           <span id="roleLabel" class="identity-role">Dozer</span>
-          <span class="identity-sub">OPERATOR</span>
         </span>
       </button>
+      <div class="nav-strip" aria-label="Search and navigation">
+        <form id="navSearchForm" class="nav-search-form" action="javascript:void(0)">
+          <input id="navSearchInput" class="nav-search-input" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search address…" aria-label="Search address" />
+          <button type="submit" id="navSearchBtn" class="nav-search-btn" title="Search">Go</button>
+        </form>
+        <button type="button" id="navDirectionsBtn" class="badge nav-dir-btn" title="Directions to search or selected pin">DIR</button>
+        <button type="button" id="navClearRouteBtn" class="badge nav-clear-btn" hidden title="Clear route">CLR</button>
+        <span id="speedBadge" class="badge speed-badge" title="Speed">— mph</span>
+        <span id="navEtaBadge" class="badge nav-eta-badge" hidden title="Route">—</span>
+      </div>
       <div class="identity-meta">
-        <button type="button" id="channelsBtn" class="badge channels-btn" hidden title="Map channels">CHANNELS</button>
+        <button type="button" id="channelsBtn" class="badge channels-btn" hidden title="Leave map / channels lobby">LEAVE</button>
         <span id="channelChip" class="badge channel-chip" hidden title="Current map">SOLO</span>
+        <button type="button" id="layoutChangeBtn" class="badge layout-btn" hidden title="Change layout">LAYOUT</button>
+        <span id="layoutChip" class="badge layout-chip" hidden title="Current layout">—</span>
         <span id="gpsBadge" class="badge gps-off" title="GPS">GPS</span>
         <span id="syncBadge" class="badge sync-local" title="Sync">SOLO</span>
         <button type="button" id="nearbyBtn" class="badge nearby-btn" title="Users in map view">NEARBY</button>
@@ -47,6 +57,12 @@
     <!-- LEFT: equipment / machine actions -->
     <aside id="leftRail" class="rail rail-left" aria-label="Machine tools">
       <div class="rail-panel">
+        <div class="rail-section" aria-label="Channels">
+          <span class="rail-label">Channels</span>
+          <div id="leftChannelListEx" class="left-channel-list"></div>
+          <button type="button" id="leftSoloBtnEx" class="channel-mini-btn">Solo</button>
+          <button type="button" id="leftLobbyBtnEx" class="channel-mini-btn">Lobby</button>
+        </div>
         <div class="rail-section" aria-label="Place machine">
           <span class="rail-label">Machine</span>
           <button type="button" class="tool tool-machine" data-tool="place-dozer" aria-label="Put a dozer on the map">
@@ -173,6 +189,22 @@
     </div>
 
     <!-- BOTTOM: truck / haul path tools -->
+    <aside id="everydayRail" class="rail rail-left everyday-rail" aria-label="Channels and places" hidden>
+      <div class="rail-panel">
+        <div class="rail-section" aria-label="Channels">
+          <span class="rail-label">Channels</span>
+          <div id="leftChannelList" class="left-channel-list"></div>
+          <button type="button" id="leftSoloBtn" class="channel-mini-btn">Solo</button>
+          <button type="button" id="leftLobbyBtn" class="channel-mini-btn">Lobby</button>
+        </div>
+        <div class="rail-section" aria-label="Places">
+          <span class="rail-label">Places</span>
+          <div id="everydayTools" class="everyday-tools"></div>
+        </div>
+      </div>
+      <button type="button" id="everydayRailHandle" class="rail-handle" aria-label="Hide or show places" aria-controls="everydayRail" aria-expanded="true">‹</button>
+    </aside>
+
     <aside id="truckBar" class="truck-bar" aria-label="Truck path tools">
       <button type="button" id="truckBarHandle" class="truck-handle" aria-label="Hide or show truck path tools" aria-controls="truckBar" aria-expanded="false">
         <span class="truck-handle-grip" aria-hidden="true"></span>
@@ -244,6 +276,14 @@
       </div>
       <h2 class="channels-list-label">Your channels</h2>
       <div id="channelsList" class="channels-list" role="list"></div>
+    </div>
+  </div>
+
+  <div id="layoutGate" class="layout-gate" hidden>
+    <div class="layout-card">
+      <h1 class="layout-title">Pick a layout</h1>
+      <p class="layout-copy">Tools for this map. Excavation keeps Site Ops; Everyday is personal places. Channels can customize later.</p>
+      <div id="layoutList" class="layout-list" role="list"></div>
     </div>
   </div>
 
@@ -426,6 +466,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=45"></script>
+  <script src="js/app.js?v=46"></script>
 </body>
 </html>

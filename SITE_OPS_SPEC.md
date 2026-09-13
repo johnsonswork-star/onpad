@@ -1,7 +1,7 @@
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 
-Last updated: 2026-09-13 (map channels v1 — Discord-style shared maps)
+Last updated: 2026-09-13 (channels + layout picker: Excavation / Everyday)
 
 ---
 
@@ -31,6 +31,22 @@ Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, s
 - Solo map uses the existing SITE room (today’s ?v=44 experience).
 - CHANNELS control on the map returns to the lobby without signing out.
 - Deep link: `?ch=CODE`.
+
+### Layouts (extensible)
+
+Layouts are **data** (`id`, `name`, tool list / HUD), not hard-coded forever. V1 presets:
+
+1. **Excavation** — current OnPad toolset (machines, water, paths, Site Ops, clock-in).
+2. **Everyday** — personal pins: House, Work, Friend, Family, Church, School, Gym, Restaurant, Coffee, Store, Grocery, Gas, Doctor, Pharmacy, Park, Trail, Meet, Parking, Other. Letter placeholders OK. Pins use object sheet (like/dislike/flag) + name; same tap rules.
+
+Flow: Google → Channels → Solo or channel → **pick layout** (or remember last) → map.
+
+Tool registry + layout presets so new pin types are additive. Channel custom layout editor later.
+
+- **Solo default layout = Everyday** (excavation is opt-in via LAYOUT).
+- Channel LIVE presence is scoped to `CH-{id}` only; LEAVE/CHANNELS drops presence.
+- Top bar: address search (Nominatim) + driving directions (OSRM) + speed.
+- Left rail: Discord-style channel switch + layout tools.
 
 ---
 
