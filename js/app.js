@@ -210,6 +210,9 @@
   function googleName() {
     try { return (localStorage.getItem('onpad:googleName') || '').trim(); } catch (e) { return ''; }
   }
+  function googlePictureStored() {
+    try { return (localStorage.getItem('onpad:googlePicture') || '').trim(); } catch (e) { return ''; }
+  }
   function googlePicture() {
     try {
       const acc = window.OnPadAccount;
@@ -3306,6 +3309,8 @@
     lookup: (userId) => lookupProfile(userId),
     profileLabel: (userIdOrFeature) => profileLabel(userIdOrFeature),
     signedIn: () => googleSignedIn(),
+    photoUrl: () => (googleSignedIn() ? googlePictureStored() : ''),
+    avatarUrl: () => (googleSignedIn() ? googlePictureStored() : ''),
     signOut: () => signOutGoogle(),
     likesReceived: (userId) => accountLikesReceived(userId),
     dislikesReceived: (userId) => accountDislikesReceived(userId),
@@ -3674,6 +3679,7 @@
         if (isMachineRole(role)) ico.innerHTML = roleSvg(role);
         else ico.innerHTML = '<span class="role-letter" aria-hidden="true">' + (ROLE_LETTER[role] || '?') + '</span>';
       }
+      try { syncIdentityUi(); } catch (e) {}
     },
     pinCount() {
       const n = (state.stakeDraft.pins || []).length;
@@ -3692,6 +3698,40 @@
       if (pp) pp.classList.toggle('active', placeTool === 'path-point');
     }
   };
+
+
+  /* Refresh Google avatar chip on identity bar + profile (sign-in/out). */
+  function syncIdentityUi() {
+    const raw = googleSignedIn() ? googlePictureStored() : '';
+    const pic = (raw && /^https?:\/\//i.test(raw)) ? raw : '';
+    const show = !!pic;
+
+    const idAvatar = document.getElementById('identityAvatar');
+    const roleIcon = document.getElementById('roleIcon');
+    if (idAvatar) {
+      if (show) {
+        if (idAvatar.getAttribute('src') !== pic) idAvatar.setAttribute('src', pic);
+        idAvatar.hidden = false;
+        if (roleIcon) roleIcon.hidden = true;
+      } else {
+        idAvatar.removeAttribute('src');
+        idAvatar.hidden = true;
+        if (roleIcon) roleIcon.hidden = false;
+      }
+    }
+
+    ['profileAvatar', 'userIdAvatar'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (show) {
+        if (el.getAttribute('src') !== pic) el.setAttribute('src', pic);
+        el.hidden = false;
+      } else {
+        el.removeAttribute('src');
+        el.hidden = true;
+      }
+    });
+  }
 
   function openSheet(id) {
     const el = document.getElementById(id);
@@ -3730,6 +3770,7 @@
       crew.classList.toggle('is-on', !isMachineRole(role));
     }
     syncGoogleAuthUi();
+    try { syncIdentityUi(); } catch (e) {}
     updateProfileProgress();
     ensureDisplayNameSeeded();
     updateSocialCreditUi();

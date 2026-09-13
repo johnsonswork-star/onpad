@@ -111,6 +111,52 @@ body.truck-open .leaflet-bottom {
   display: flex; align-items: center; justify-content: center;
 }
 .identity-icon svg { width: 32px; height: 32px; display: block; }
+
+/* Google identity avatar chip (?v=50) — outdoor-readable high-contrast ring */
+.identity-avatar,
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 3px solid #f0e6d0;
+  box-shadow: 0 0 0 2px #1a1410, 0 2px 6px rgba(0, 0, 0, 0.55);
+  background: #2a2418;
+}
+.identity-avatar[hidden],
+.profile-avatar[hidden] { display: none !important; }
+.identity-compact .identity-avatar {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-width: 2px;
+}
+.profile-avatar-sm {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-width: 2px;
+}
+.userid-chip-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+}
+.profile-sheet-title .profile-avatar {
+  vertical-align: middle;
+}
+.google-user-chip .profile-avatar,
+.google-user-chip .identity-avatar {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+  border-width: 2px;
+}
+
 .identity-copy {
   display: flex;
   flex-direction: column;
