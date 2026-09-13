@@ -211,7 +211,20 @@
     try { return (localStorage.getItem('onpad:googleName') || '').trim(); } catch (e) { return ''; }
   }
   function googlePicture() {
-    try { return (localStorage.getItem('onpad:googlePicture') || '').trim(); } catch (e) { return ''; }
+    try {
+      const acc = window.OnPadAccount;
+      if (acc) {
+        if (typeof acc.photoUrl === 'function') {
+          const u = acc.photoUrl();
+          if (u) return String(u).trim();
+        }
+        if (typeof acc.avatarUrl === 'function') {
+          const u = acc.avatarUrl();
+          if (u) return String(u).trim();
+        }
+      }
+    } catch (e) {}
+    try { return (localStorage.getItem('onpad:googlePicture') || '').trim(); } catch (e2) { return ''; }
   }
   function syncUserAvatar() {
     const inGoogle = googleSignedIn();
@@ -312,10 +325,14 @@
       } catch (e) {}
       if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
       else localStorage.removeItem('onpad:googlePicture');
-      mapMode = 'lobby';
-      activeChannelId = '';
-      activeLayoutId = '';
-      try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (eLm) {}
+      /* Stay on / open Solo map after sign-in — CHANNELS is opt-in */
+      if (mapMode === 'lobby' || !isMapOpen()) {
+        mapMode = 'solo';
+        activeChannelId = '';
+        activeSite = SOLO_SITE;
+        try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'solo' })); } catch (eLm) {}
+        try { switchToActiveSite(); } catch (eSw) {}
+      }
       try { syncUserAvatar(); } catch (eAv) {}
       if (!displayName() && payload.name) setDisplayName(payload.name);
       if (!displayName() && payload.email) {
@@ -419,7 +436,7 @@
       syncClockInGate();
       return;
     }
-    /* Signed in: lobby until Solo or a channel is opened */
+    /* Signed in: map open (Solo/channel) or lobby if user opened CHANNELS */
     syncChannelsGate();
     if (isMapOpen()) ensureLayoutOrPicker();
     else {
@@ -698,13 +715,32 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Cold open / refresh always Channels lobby (Chris ?v=48).
-       Deep link ?ch= still handled in bootFromUrl. */
-    mapMode = 'lobby';
+    /* Chris revise ?v=49: do NOT force lobby. Restore last map, else Solo.
+       CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
+    try {
+      const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
+      if (saved && saved.mode === 'channel' && saved.id) {
+        mapMode = 'channel';
+        activeChannelId = String(saved.id).toUpperCase();
+        activeSite = channelRoomCode(activeChannelId);
+        return;
+      }
+      if (saved && saved.mode === 'solo') {
+        mapMode = 'solo';
+        activeChannelId = '';
+        activeSite = SOLO_SITE;
+        return;
+      }
+      if (saved && saved.mode === 'lobby') {
+        mapMode = 'lobby';
+        activeChannelId = '';
+        activeSite = SOLO_SITE;
+        return;
+      }
+    } catch (e) {}
+    mapMode = 'solo';
     activeChannelId = '';
     activeSite = SOLO_SITE;
-    activeLayoutId = '';
-    try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (e) {}
   }
   function getLayout() {
     return LAYOUT_PRESETS[activeLayoutId] || null;
@@ -2644,7 +2680,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=48: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=49: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5559,8 +5595,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v48').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=48')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v49').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=49')).catch(() => {});
   }
 
   function showBootError(msg) {

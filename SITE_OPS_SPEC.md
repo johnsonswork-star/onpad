@@ -50,7 +50,7 @@ Tool registry + layout presets so new pin types are additive. Channel custom lay
 - **Solo = no bottom bar** (no Park/Switch/End / truck paths).
 - Channel **purpose at create** locks layout + bottom chrome (Excavation → shift+truck; Everyday → blank bottom).
 - Bottom HUD clears Safari chrome via `--bottom-ui` (safe-area + browser chrome pad).
-- Cold open / post-login → **Channels lobby** (not straight to map). `?ch=` deep link excepted.
+- Cold open restores last Solo/channel (default Solo). **CHANNELS** badge is opt-in — not a forced lobby.
 - Top bar: slim Maps-style search; DIR/speed under ···; signed-in avatar chip.
 
 ---
