@@ -32,7 +32,11 @@ Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, s
 - CHANNELS control on the map returns to the lobby without signing out.
 - Deep link: `?ch=CODE`.
 
-### Layouts (extensible)
+### Everyday mock chrome (?v=57)
+
+When layout/purpose is **Everyday** (Solo map OR channel created with Everyday purpose), use the Chris mock chrome: transparent topbar (no haze), avatar + Search map: only, collapsed left › rail, short pin name + ▲▼ chips, blank bottom. Excavation purpose/layout keeps shift/truck bottom and excavation tools. Chrome is driven by `body.everyday-chrome` from layout id, not Solo-only.
+
+## Layouts (extensible)
 
 Layouts are **data** (`id`, `name`, tool list / HUD), not hard-coded forever. V1 presets:
 

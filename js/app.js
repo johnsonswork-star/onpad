@@ -513,18 +513,17 @@
       }
     }
     const back = document.getElementById('channelsBtn');
+    const everydayChrome = isMapOpen() && !!(getLayout() && getLayout().id === 'everyday');
     if (back) {
-      const soloEveryday = mapMode === 'solo' && !!(getLayout() && getLayout().id === 'everyday');
-      back.hidden = !(inGoogle && isMapOpen()) || soloEveryday;
+      /* Everyday chrome: CHANNELS/LEAVE via left › rail — not top strip */
+      back.hidden = !(inGoogle && isMapOpen()) || everydayChrome;
       back.textContent = mapMode === 'channel' ? 'LEAVE' : 'CHANNELS';
     }
     const chChip = document.getElementById('channelChip');
-    if (chChip && mapMode === 'solo' && getLayout() && getLayout().id === 'everyday') {
-      chChip.hidden = true;
-    }
+    if (chChip && everydayChrome) chChip.hidden = true;
     const layChip = document.getElementById('layoutChip');
     const layBtn = document.getElementById('layoutChangeBtn');
-    if (mapMode === 'solo' && getLayout() && getLayout().id === 'everyday') {
+    if (everydayChrome) {
       if (layChip) layChip.hidden = true;
       if (layBtn) layBtn.hidden = true;
     }
@@ -726,7 +725,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=56: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=57: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -1076,9 +1075,11 @@
     const solo = mapMode === 'solo';
     const allowShift = channelAllowsShiftBottom();
     document.body.classList.toggle('map-solo', solo && isMapOpen());
-    const everydaySolo = solo && isMapOpen() && !!(getLayout() && getLayout().id === 'everyday');
-    document.body.classList.toggle('solo-everyday-chrome', everydaySolo);
-    document.body.classList.toggle('purpose-blank-bottom', isMapOpen() && !solo && !allowShift);
+    /* Mock chrome = Everyday layout (Solo OR channel purpose) — not Solo-only */
+    const everydayChrome = isMapOpen() && !!(getLayout() && getLayout().id === 'everyday');
+    document.body.classList.toggle('everyday-chrome', everydayChrome);
+    document.body.classList.toggle('solo-everyday-chrome', everydayChrome); /* alias */
+    document.body.classList.toggle('purpose-blank-bottom', isMapOpen() && !allowShift);
     const roleBtn = document.getElementById('roleBtn');
     if (roleBtn) roleBtn.hidden = !(isMapOpen() && allowShift);
     const truck = document.getElementById('truckBar');
@@ -1679,7 +1680,7 @@
     } catch (e2) {}
     const btn = document.getElementById('nearbyBtn');
     if (btn) {
-      const hideChrome = document.body.classList.contains('solo-everyday-chrome');
+      const hideChrome = document.body.classList.contains('everyday-chrome');
       btn.hidden = hideChrome;
       btn.textContent = 'NEARBY ' + rows.length;
       btn.setAttribute('data-count', String(rows.length));
@@ -2708,7 +2709,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=56: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=57: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5734,8 +5735,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v56').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=56')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v57').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=57')).catch(() => {});
   }
 
   function showBootError(msg) {
