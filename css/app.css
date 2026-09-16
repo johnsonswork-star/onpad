@@ -86,7 +86,8 @@ body.truck-open .leaflet-bottom {
   align-items: center;
   gap: 8px;
   padding: calc(8px + var(--safe-t)) 10px 8px;
-  background: linear-gradient(180deg, #1c1814f2 0%, #1c1814cc 70%, #1c181400 100%);
+  /* No top vignette — map stays full brightness under chrome (Chris ?v=54) */
+  background: transparent;
   pointer-events: none;
 }
 #topbar > * { pointer-events: auto; }
@@ -1883,7 +1884,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=53) */
+/* Layout picker + Everyday rail (?v=54) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1988,7 +1989,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=53) */
+/* Top nav strip — search / speed / directions (?v=54) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2067,7 +2068,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=53) */
+/* Purpose-aware bottom chrome (?v=54) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2085,7 +2086,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=53) */
+/* Compact Maps-style topbar (?v=54) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2205,7 +2206,7 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* P3 marker scores ▲▼ (?v=53) */
+/* P3 marker scores ▲▼ (?v=54) */
 .marker-score {
   margin-top: 1px;
   max-width: 94px;
