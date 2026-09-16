@@ -720,7 +720,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=52: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=53: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -1686,8 +1686,10 @@
     const ul = panel.querySelector('.nearby-list');
     rows.forEach((r) => {
       const li = document.createElement('li');
+      const score = ownerScoreParts(r.userId);
       const label = (r.name || truncUserId(r.userId)) +
-        (r.role ? (' · ' + (ROLE_LABEL[r.role] || r.role)) : '');
+        (r.role ? (' · ' + (ROLE_LABEL[r.role] || r.role)) : '') +
+        (score.label ? (' · ' + score.label) : '');
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'nearby-user';
@@ -2685,7 +2687,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=52: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=53: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -3112,6 +3114,54 @@
   function formatNet(n) {
     const v = Number(n) || 0;
     return (v > 0 ? '+' : '') + String(v);
+  }
+  /* P3 — map marker + list scores (prefer OnPadAccount helpers) */
+  function ownerScoreParts(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return { likes: 0, dislikes: 0, net: 0, label: '', compact: '' };
+    try {
+      if (window.OnPadAccount && typeof window.OnPadAccount.getScore === 'function') {
+        const s = window.OnPadAccount.getScore(id);
+        if (s && typeof s === 'object') {
+          const likes = Number(s.likes) || 0;
+          const dislikes = Number(s.dislikes) || 0;
+          const net = (s.net != null) ? Number(s.net) : (likes - dislikes);
+          const label = s.label || ('▲ ' + likes + '  ▼ ' + dislikes);
+          return { likes: likes, dislikes: dislikes, net: net, label: label, compact: formatNet(net) };
+        }
+      }
+      if (window.OnPadAccount && typeof window.OnPadAccount.scoreFormat === 'function') {
+        const label = window.OnPadAccount.scoreFormat(id) || '';
+        const net = (typeof window.OnPadAccount.scoreNet === 'function')
+          ? Number(window.OnPadAccount.scoreNet(id)) || 0
+          : 0;
+        return { likes: 0, dislikes: 0, net: net, label: label, compact: formatNet(net) };
+      }
+    } catch (e) {}
+    const s = accountGetScore(id);
+    return {
+      likes: s.likes,
+      dislikes: s.dislikes,
+      net: s.net,
+      label: s.label,
+      compact: formatNet(s.net)
+    };
+  }
+  function markerScoreHtml(userId) {
+    const id = String(userId || '').trim();
+    if (!id) return '';
+    const s = ownerScoreParts(id);
+    if (!s.label && !s.compact) return '';
+    const tone = s.net >= 5 ? ' score-hot' : (s.net <= -3 ? ' score-warn' : '');
+    return '<div class="marker-score' + tone + '" title="' + escHtml(s.label) + '">' +
+      escHtml(s.label || s.compact) + '</div>';
+  }
+  function scoreRingCss(userId, selected) {
+    if (selected) return 'outline:3px solid #f5d547;outline-offset:3px;';
+    const s = ownerScoreParts(userId);
+    if (s.net >= 5) return 'outline:3px solid #7dff9a;outline-offset:2px;box-shadow:0 0 10px #7dff9a88;';
+    if (s.net <= -3) return 'outline:3px solid #ff8a6a;outline-offset:2px;';
+    return '';
   }
   function syncProfileScoreHeader() {
     const id = viewingUserId || localUserId();
@@ -4678,14 +4728,17 @@
     const type = (p && p.type) || 'other';
     const color = pinColor(type);
     const label = escHtml(String(p.name || pinLabel(type)));
+    const owner = (p && (p.userId || p.by)) || '';
+    const ring = scoreRingCss(owner, on);
     return L.divIcon({
-      className: 'pin-wrap has-name',
-      iconSize: [88, 44],
-      iconAnchor: [44, 14],
+      className: 'pin-wrap has-name has-score',
+      iconSize: [96, 58],
+      iconAnchor: [48, 14],
       html: '<div class="marker-stack">' +
-        '<div class="pin-body" style="background:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' +
+        '<div class="pin-body" style="background:' + color + ';' + ring + '">' +
           '<span class="machine-glyph">' + pinSvg(type) + '</span></div>' +
-        '<div class="marker-name">' + label + '</div></div>'
+        '<div class="marker-name">' + label + '</div>' +
+        markerScoreHtml(owner) + '</div>'
     });
   }
   function drawPins() {
@@ -4775,14 +4828,17 @@
     const r = (f && f.role) || 'dozer';
     const color = roleMarkerColor(r);
     const label = escHtml(presenceDisplayName(f));
+    const owner = (f && (f.userId || f.by)) || '';
+    const ring = scoreRingCss(owner, on);
     return L.divIcon({
-      className: 'fleet-wrap has-name',
-      iconSize: [88, 44],
-      iconAnchor: [44, 14],
+      className: 'fleet-wrap has-name has-score',
+      iconSize: [96, 58],
+      iconAnchor: [48, 14],
       html: '<div class="marker-stack">' +
-        '<div class="fleet-body" style="color:' + color + ';' + (on ? 'outline:3px solid #f5d547;outline-offset:3px;' : '') + '">' +
+        '<div class="fleet-body" style="color:' + color + ';' + ring + '">' +
           '<span class="machine-glyph">' + roleSvg(r) + '</span></div>' +
-        '<div class="marker-name">' + label + '</div></div>'
+        '<div class="marker-name">' + label + '</div>' +
+        markerScoreHtml(owner) + '</div>'
     });
   }
 
@@ -4838,15 +4894,18 @@
     const r = (m && (m.role || m.byRole)) || 'dozer';
     const color = roleMarkerColor(r);
     const label = escHtml(presenceDisplayName(m));
+    const owner = (m && (m.userId || m.by)) || '';
+    const ring = scoreRingCss(owner, !!me);
     /* Ring/shadow use currentColor; glyph must contrast (dark) — not same as fill */
     return L.divIcon({
-      className: 'machine-wrap has-name',
-      iconSize: [88, 46],
-      iconAnchor: [44, 15],
+      className: 'machine-wrap has-name has-score',
+      iconSize: [96, 60],
+      iconAnchor: [48, 15],
       html: '<div class="marker-stack">' +
-        '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + '">' +
+        '<div class="machine-body' + (me ? ' machine-me' : '') + '" style="color:' + color + ';background:' + color + ';' + ring + '">' +
           '<span class="machine-glyph">' + roleSvg(r) + '</span></div>' +
-        '<div class="marker-name">' + label + (me ? ' · YOU' : '') + '</div></div>'
+        '<div class="marker-name">' + label + (me ? ' · YOU' : '') + '</div>' +
+        markerScoreHtml(owner) + '</div>'
     });
   }
 
@@ -5638,8 +5697,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v52').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=52')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v53').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=53')).catch(() => {});
   }
 
   function showBootError(msg) {

@@ -1883,7 +1883,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=52) */
+/* Layout picker + Everyday rail (?v=53) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1988,7 +1988,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=52) */
+/* Top nav strip — search / speed / directions (?v=53) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2067,7 +2067,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=52) */
+/* Purpose-aware bottom chrome (?v=53) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2085,7 +2085,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=52) */
+/* Compact Maps-style topbar (?v=53) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2202,4 +2202,39 @@ body:not(.map-open) #topbar .nav-extra {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 260px;
+}
+
+
+/* P3 marker scores ▲▼ (?v=53) */
+.marker-score {
+  margin-top: 1px;
+  max-width: 94px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #0e0b08f2;
+  border: 1px solid #f5d547cc;
+  color: #ffe08a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+.marker-score.score-hot {
+  border-color: #7dff9a;
+  color: #b8ffc9;
+}
+.marker-score.score-warn {
+  border-color: #ff8a6a;
+  color: #ffc4b0;
+}
+.machine-wrap.has-score,
+.fleet-wrap.has-score,
+.pin-wrap.has-score {
+  overflow: visible;
 }

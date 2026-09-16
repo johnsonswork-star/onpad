@@ -419,7 +419,7 @@ Mod bar:
 |-------|-------|-------|
 | P1 Clock-in / park / end | App Builder | Shipped `?v=36`; report rule on `?v=38` |
 | P2 Object sheet tap targets | App Builder | Machine→object sheet; name→profile |
-| P3 Scores ▲▼ | Profile helpers + map display | Profile tip `?v=39` |
+| P3 Scores ▲▼ | Map markers + nearby | Shipped `?v=53` |
 | P4 Mod stealth + L3 swipe report queue | Map UI Builder; L3 gate + punishment record Profile | After Profile `?v=39`; map `?v=40+` |
 | P5 Send to Grok Bot | — | **CANCELLED** |
 
