@@ -86,7 +86,7 @@ body.truck-open .leaflet-bottom {
   align-items: center;
   gap: 8px;
   padding: calc(8px + var(--safe-t)) 10px 8px;
-  /* No top vignette — map stays full brightness under chrome (Chris ?v=54) */
+  /* No top vignette — map stays full brightness under chrome (Chris ?v=55) */
   background: transparent;
   pointer-events: none;
 }
@@ -1884,7 +1884,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=54) */
+/* Layout picker + Everyday rail (?v=55) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1989,7 +1989,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=54) */
+/* Top nav strip — search / speed / directions (?v=55) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2068,7 +2068,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=54) */
+/* Purpose-aware bottom chrome (?v=55) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2086,7 +2086,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=54) */
+/* Compact Maps-style topbar (?v=55) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2206,7 +2206,7 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* P3 marker scores ▲▼ (?v=54) */
+/* P3 marker scores ▲▼ (?v=55) */
 .marker-score {
   margin-top: 1px;
   max-width: 94px;
@@ -2238,4 +2238,56 @@ body:not(.map-open) #topbar .nav-extra {
 .fleet-wrap.has-score,
 .pin-wrap.has-score {
   overflow: visible;
+}
+
+
+/* Solo Everyday default chrome — Chris mock (?v=55) */
+body.solo-everyday-chrome .identity-meta,
+body.solo-everyday-chrome #navMoreBtn,
+body.solo-everyday-chrome #navExtra,
+body.solo-everyday-chrome #channelsBtn,
+body.solo-everyday-chrome #channelChip,
+body.solo-everyday-chrome #layoutChangeBtn,
+body.solo-everyday-chrome #layoutChip,
+body.solo-everyday-chrome #nearbyBtn,
+body.solo-everyday-chrome #reportQueueBtn,
+body.solo-everyday-chrome #modToolsChip,
+body.solo-everyday-chrome #roleBtn,
+body.solo-everyday-chrome #gpsBadge,
+body.solo-everyday-chrome #syncBadge {
+  display: none !important;
+}
+body.solo-everyday-chrome #topbar {
+  background: transparent;
+}
+body.solo-everyday-chrome .nav-search-slim {
+  max-width: min(72vw, 420px);
+}
+body.solo-everyday-chrome .nav-search-slim .nav-search-input {
+  min-height: 40px;
+  border-radius: 22px;
+  border: 2px solid #5a5046;
+  background: #1c1814f5;
+  box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  font-size: 1rem;
+}
+/* Left: collapsed › handle only until opened */
+body.solo-everyday-chrome #everydayRail:not(.open) {
+  transform: translateX(calc(-1 * var(--rail-w)));
+}
+body.solo-everyday-chrome #everydayRail:not(.open) .rail-panel {
+  visibility: hidden;
+}
+/* Separate name + score chips under pins */
+.marker-name {
+  border-radius: 8px;
+  padding: 3px 8px;
+  background: #1c1814f5;
+  border: 1px solid #f5d547aa;
+}
+.marker-score {
+  margin-top: 4px;
+  border-radius: 8px;
+  padding: 3px 8px;
+  background: #1c1814f5;
 }
