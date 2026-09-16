@@ -232,8 +232,8 @@
   function syncUserAvatar() {
     const inGoogle = googleSignedIn();
     const pic = googlePicture();
+    const brand = 'icons/brand-avatar.png';
     const name = (displayName() || googleName() || googleEmail() || 'You').trim();
-    const initial = (name.charAt(0) || '?').toUpperCase();
     const btn = document.getElementById('userAvatarBtn');
     const img = document.getElementById('userAvatarImg');
     const fb = document.getElementById('userAvatarFallback');
@@ -242,18 +242,13 @@
       btn.title = inGoogle ? name : '';
     }
     if (img) {
-      if (inGoogle && pic) {
-        img.src = pic;
-        img.hidden = false;
-        img.alt = name;
-      } else {
-        img.removeAttribute('src');
-        img.hidden = true;
-      }
+      /* Mock: waterfall/cliff brand art when no Google photo — never letter C */
+      img.src = (inGoogle && pic) ? pic : brand;
+      img.hidden = !inGoogle;
+      img.alt = (inGoogle && pic) ? name : 'OnPad';
     }
     if (fb) {
-      fb.textContent = initial;
-      fb.hidden = !!(inGoogle && pic);
+      fb.hidden = true; /* brand art replaces letter fallback */
     }
     const row = document.getElementById('channelsUserRow');
     const cImg = document.getElementById('channelsUserAvatar');
@@ -731,7 +726,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=55: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=56: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -783,7 +778,9 @@
     document.body.classList.toggle('layout-picked', !!lay);
     const er = document.getElementById('everydayRail');
     if (er) {
-      /* Solo Everyday default: collapsed › tab only (Chris mock ?v=55) */
+      if (hud === 'everyday') er.removeAttribute('hidden');
+      else er.setAttribute('hidden', '');
+      /* Solo Everyday default: collapsed › tab only */
       er.classList.remove('open');
       const eh = document.getElementById('everydayRailHandle');
       if (eh) {
@@ -925,6 +922,11 @@
     return PIN_COLORS[type] || '#a8a29e';
   }
   function pinSvg(type) {
+    if (type === 'house') {
+      return '<svg class="pin-arrow-glyph" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path d="M12 3 L12 17 M12 3 L7 9 M12 3 L17 9" fill="none" stroke="#1c1814" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>';
+    }
     return '<span class="pin-letter">' + escHtml(pinLetter(type)) + '</span>';
   }
   function renderLeftChannelLists() {
@@ -2706,7 +2708,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=55: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=56: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -4909,13 +4911,29 @@
     if (r === 'spotter' || r === 'qa') return '#9a8a70';
     return '#f0c040'; /* dozer + default */
   }
+  function selfArrowIcon(m) {
+    const hdg = (m && m.hdg != null && isFinite(m.hdg)) ? Number(m.hdg) : 0;
+    const owner = (m && (m.userId || m.by)) || '';
+    const score = markerScoreHtml(owner);
+    return L.divIcon({
+      className: 'self-wrap has-name has-score',
+      iconSize: [96, 60],
+      iconAnchor: [48, 18],
+      html: '<div class="marker-stack">' +
+        '<div class="self-arrow-body" style="transform:rotate(' + hdg + 'deg)">' +
+          '<span class="self-arrow-glyph" aria-hidden="true">▲</span></div>' +
+        (score || '') + '</div>'
+    });
+  }
   function machineIcon(m, me) {
+    const lay = getLayout();
+    /* Solo Everyday self = blue disc + black heading arrow (Chris mock) */
+    if (me && lay && lay.id === 'everyday') return selfArrowIcon(m);
     const r = (m && (m.role || m.byRole)) || 'dozer';
     const color = roleMarkerColor(r);
     const label = escHtml(presenceDisplayName(m));
     const owner = (m && (m.userId || m.by)) || '';
     const ring = scoreRingCss(owner, !!me);
-    /* Ring/shadow use currentColor; glyph must contrast (dark) — not same as fill */
     return L.divIcon({
       className: 'machine-wrap has-name has-score',
       iconSize: [96, 60],
@@ -5716,8 +5734,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v55').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=55')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v56').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=56')).catch(() => {});
   }
 
   function showBootError(msg) {

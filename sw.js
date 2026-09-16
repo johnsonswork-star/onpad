@@ -1,14 +1,15 @@
 /* OnPad service worker — only cache same-origin. Never touch map tiles. (v=39 SITE OPS scores + stealth mod tools + L3 report queue) */
-const CACHE = 'onpad-v55';
+const CACHE = 'onpad-v56';
 const CORE = [
   './',
   './index.html',
-  './css/app.css?v=55',
-  './js/app.js?v=55',
+  './css/app.css?v=56',
+  './js/app.js?v=56',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './icons/brand-avatar.png',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/leaflet.js',
   './vendor/mqtt/mqtt.min.js'

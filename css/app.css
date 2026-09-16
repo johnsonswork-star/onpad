@@ -86,7 +86,7 @@ body.truck-open .leaflet-bottom {
   align-items: center;
   gap: 8px;
   padding: calc(8px + var(--safe-t)) 10px 8px;
-  /* No top vignette — map stays full brightness under chrome (Chris ?v=55) */
+  /* No top vignette — map stays full brightness under chrome (Chris ?v=56) */
   background: transparent;
   pointer-events: none;
 }
@@ -1884,7 +1884,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=55) */
+/* Layout picker + Everyday rail (?v=56) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1989,7 +1989,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=55) */
+/* Top nav strip — search / speed / directions (?v=56) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2068,7 +2068,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=55) */
+/* Purpose-aware bottom chrome (?v=56) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2086,7 +2086,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=55) */
+/* Compact Maps-style topbar (?v=56) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2206,15 +2206,15 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* P3 marker scores ▲▼ (?v=55) */
+/* P3 marker scores ▲▼ (?v=56) */
 .marker-score {
   margin-top: 1px;
   max-width: 94px;
   padding: 1px 5px;
   border-radius: 6px;
   background: #0e0b08f2;
-  border: 1px solid #f5d547cc;
-  color: #ffe08a;
+  border: 1px solid #f5d547aa;
+  color: #f5f0e6;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -2241,7 +2241,7 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* Solo Everyday default chrome — Chris mock (?v=55) */
+/* Solo Everyday default chrome — Chris mock (?v=56) */
 body.solo-everyday-chrome .identity-meta,
 body.solo-everyday-chrome #navMoreBtn,
 body.solo-everyday-chrome #navExtra,
@@ -2266,7 +2266,7 @@ body.solo-everyday-chrome .nav-search-slim {
 body.solo-everyday-chrome .nav-search-slim .nav-search-input {
   min-height: 40px;
   border-radius: 22px;
-  border: 2px solid #5a5046;
+  border: 1.5px solid rgb(119, 96, 77);
   background: #1c1814f5;
   box-shadow: 0 4px 14px rgba(0,0,0,.4);
   font-size: 1rem;
@@ -2290,4 +2290,31 @@ body.solo-everyday-chrome #everydayRail:not(.open) .rail-panel {
   border-radius: 8px;
   padding: 3px 8px;
   background: #1c1814f5;
+  color: #f5f0e6;
+}
+.self-arrow-body {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #5b8def;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.45);
+}
+.self-arrow-glyph {
+  color: #1c1814;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+.pin-arrow-glyph {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+/* Never restore top haze */
+#topbar {
+  background: transparent !important;
 }
