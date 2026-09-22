@@ -1,3 +1,7 @@
+## After delete lobbies (?v=67)
+
+Deleting the last lobby (or the lobby you were in) returns to **World** — never a Channel purpose prompt. Legacy channels without purpose default Everyday. Lobbies sheet includes a **World map** button under Yours.
+
 ## Create lobby name (?v=65)
 
 Lobby **name** and **purpose** are taken only from the Create tab fields. No second `prompt()` for name or purpose on create.

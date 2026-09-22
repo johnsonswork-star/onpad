@@ -511,11 +511,21 @@
         }
       });
     } catch (e3) {}
-    if (mapMode === 'channel' && String(activeChannelId || '').toUpperCase() === code) {
+    /* If stash pointed at this lobby, forget it — close must not re-enter deleted map */
+    try {
+      if (mapModeBeforeLobby && String(mapModeBeforeLobby.id || '').toUpperCase() === code) {
+        mapModeBeforeLobby = { mode: 'solo', id: '' };
+      }
+    } catch (eSt) {}
+    const wasHere = mapMode === 'channel' && String(activeChannelId || '').toUpperCase() === code;
+    const noneLeft = loadChannelDir().length === 0;
+    if (wasHere || noneLeft) {
       try { clearSelfPresence(false); } catch (e4) {}
-      enterSolo();
+      enterSolo(); /* Chris: after clear lobbies → World, never purpose prompt */
+    } else {
+      try { renderChannelsList(); } catch (e5) {}
     }
-    try { renderChannelsList(); } catch (e5) {}
+    try { renderChannelsList(); } catch (e6) {}
     ui.toast('Deleted · ' + label);
   }
   function addSelfToChannel(ch) {
@@ -728,20 +738,13 @@
       setActiveLayout(ch.purpose);
       syncLayoutGate();
       syncClockInGate();
-    } else if (!ch.purpose) {
-      /* Legacy channel — ask once and save */
-      const purpose = pickChannelPurpose();
-      if (purpose) {
-        ch.purpose = purpose;
-        upsertChannel(ch);
-        setActiveLayout(purpose);
-        syncLayoutGate();
-        syncClockInGate();
-      } else {
-        ensureLayoutOrPicker();
-      }
     } else {
-      ensureLayoutOrPicker();
+      /* No purpose prompt — default Everyday (Create tab sets purpose for new lobbies) */
+      ch.purpose = 'everyday';
+      upsertChannel(ch);
+      setActiveLayout('everyday');
+      syncLayoutGate();
+      syncClockInGate();
     }
     try { renderLeftChannelLists(); } catch (e) {}
     ui.toast('Joined · ' + (ch.name || ch.id) + (ch.purpose ? (' · ' + ch.purpose) : ''));
@@ -837,8 +840,11 @@
     }
     const prev = mapModeBeforeLobby || { mode: 'solo', id: '' };
     if (prev.mode === 'channel' && prev.id) {
-      enterChannel(prev.id);
-      return;
+      if (findChannel(prev.id)) {
+        enterChannel(prev.id);
+        return;
+      }
+      /* Deleted while in lobbies — World */
     }
     enterSolo();
   }
@@ -5798,6 +5804,8 @@
     if (authGateFb) authGateFb.addEventListener('click', promptGoogleSignIn);
     const soloBtn = document.getElementById('channelsSoloBtn');
     if (soloBtn) soloBtn.addEventListener('click', () => enterSolo());
+    const worldTop = document.getElementById('channelsWorldBtnTop');
+    if (worldTop) worldTop.addEventListener('click', () => enterSolo());
     const createBtn = document.getElementById('channelsCreateBtn');
     if (createBtn) createBtn.addEventListener('click', () => createChannel());
     const joinBtn = document.getElementById('channelsJoinBtn');
@@ -5960,7 +5968,7 @@
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
       Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=66')).catch(() => {});
+    ).then(() => navigator.serviceWorker.register('sw.js?v=67')).catch(() => {});
   }
 
   function showBootError(msg) {

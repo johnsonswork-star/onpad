@@ -2572,7 +2572,7 @@ body.everyday-chrome #everydayRail:not(.open) .rail-panel {
 #topbar {
   background: transparent !important;
 }
-/* ========== CHAT SHELL (?v=66 Inbox — phone-first, high contrast) ========== */
+/* ========== CHAT SHELL (?v=67 Inbox — phone-first, high contrast) ========== */
 /* Chat open button: fat outdoor-readable, fixed bottom-right + safe-area */
 #chatToggle.chat-toggle,
 .chat-toggle {
@@ -2864,7 +2864,8 @@ body.everyday-chrome #everydayRail:not(.open) .rail-panel {
 }
 
 
-/* Delete created lobby maps (?v=65); chat Inbox ?v=66 */
+/* Delete created lobby maps (?v=65); chat Inbox ?v=67 */
+/* Delete created lobby maps (?v=67) */
 .channel-row-delete {
   display: block;
   width: 100%;
@@ -2879,3 +2880,8 @@ body.everyday-chrome #everydayRail:not(.open) .rail-panel {
   cursor: pointer;
 }
 .channel-row-delete:active { background: #f0e0d0; }
+
+.lobby-world-top {
+  width: 100%;
+  margin: 0 0 12px;
+}
