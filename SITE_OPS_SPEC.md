@@ -33,6 +33,10 @@ Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, s
 - Deep link: `?ch=CODE`.
 
 #
+## Lobbies cream restyle (?v=59)
+
+`#channelsGate` / `.channels-card` restyled to Chris’s cream Lobbies mock: serif title, tabs **Yours** (default) | **Public** | **Create**, soft green accents. Yours cards from `loadChannelDir()` (map thumb placeholder, name, “• Yours” pill, Code + monospace green, `n / 8`, Live). Public stays empty (no fake data). Create uses in-card name + Everyday/Excavation purpose → existing `createChannel` / purpose lock. Solo map + join-by-code remain in the footer. Maps still only via Lobbies (?v=58).
+
 ## Maps via Lobbies (?v=58)
 
 Solo and channel maps are **not** listed in the left sidebar / everyday rail. Open them only through the **Lobbies** button (lobby screen: Solo / create / join / your channels). Everyday pin tools stay in the rail.

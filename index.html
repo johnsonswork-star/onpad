@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=58" />
+  <link rel="stylesheet" href="css/app.css?v=59" />
 </head>
 <body>
   <div id="app">
@@ -273,15 +273,43 @@
         </div>
       </div>
       <h1 class="channels-title">Lobbies</h1>
-      <p class="channels-copy">Open Solo or a shared channel map here. Create or join with a code. Maps are not listed in the side rail.</p>
-      <button type="button" id="channelsSoloBtn" class="fat primary">Solo map</button>
-      <button type="button" id="channelsCreateBtn" class="fat">Create channel</button>
-      <div class="channels-join-row">
-        <input id="channelJoinInput" class="channels-join-input" type="text" inputmode="text" autocomplete="off" placeholder="Join code" maxlength="12" aria-label="Channel join code" />
-        <button type="button" id="channelsJoinBtn" class="fat">Join</button>
+      <div class="lobby-tabs" role="tablist" aria-label="Lobby views">
+        <button type="button" class="lobby-tab is-active" role="tab" id="lobbyTabYours" data-lobby-tab="yours" aria-selected="true" aria-controls="lobbyPanelYours">Yours</button>
+        <button type="button" class="lobby-tab" role="tab" id="lobbyTabPublic" data-lobby-tab="public" aria-selected="false" aria-controls="lobbyPanelPublic">Public</button>
+        <button type="button" class="lobby-tab" role="tab" id="lobbyTabCreate" data-lobby-tab="create" aria-selected="false" aria-controls="lobbyPanelCreate">Create</button>
       </div>
-      <h2 class="channels-list-label">Your channels</h2>
-      <div id="channelsList" class="channels-list" role="list"></div>
+
+      <div id="lobbyPanelYours" class="lobby-panel" role="tabpanel" data-lobby-panel="yours" aria-labelledby="lobbyTabYours">
+        <div id="channelsList" class="channels-list" role="list"></div>
+      </div>
+      <div id="lobbyPanelPublic" class="lobby-panel" role="tabpanel" data-lobby-panel="public" aria-labelledby="lobbyTabPublic" hidden>
+        <p class="hint channels-empty lobby-public-empty">No public lobbies yet</p>
+      </div>
+      <div id="lobbyPanelCreate" class="lobby-panel" role="tabpanel" data-lobby-panel="create" aria-labelledby="lobbyTabCreate" hidden>
+        <label class="lobby-create-label" for="channelCreateName">Name</label>
+        <input id="channelCreateName" class="lobby-create-input" type="text" maxlength="40" autocomplete="off" placeholder="Lobby name" aria-label="Lobby name" />
+        <fieldset class="lobby-purpose-fieldset">
+          <legend class="lobby-create-label">Purpose</legend>
+          <label class="lobby-purpose-option">
+            <input type="radio" name="channelCreatePurpose" value="everyday" checked />
+            <span>Everyday</span>
+          </label>
+          <label class="lobby-purpose-option">
+            <input type="radio" name="channelCreatePurpose" value="excavation" />
+            <span>Excavation</span>
+          </label>
+        </fieldset>
+        <button type="button" id="channelsCreateBtn" class="fat lobby-create-btn">Create lobby</button>
+        <p class="hint lobby-create-hint">Purpose locks this lobby’s layout (Everyday / Excavation).</p>
+      </div>
+
+      <div class="channels-footer">
+        <button type="button" id="channelsSoloBtn" class="fat primary">Solo map</button>
+        <div class="channels-join-row">
+          <input id="channelJoinInput" class="channels-join-input" type="text" inputmode="text" autocomplete="off" placeholder="Join code" maxlength="12" aria-label="Channel join code" />
+          <button type="button" id="channelsJoinBtn" class="fat">Join</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -475,6 +503,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=58"></script>
+  <script src="js/app.js?v=59"></script>
 </body>
 </html>

@@ -531,8 +531,21 @@
     try { syncUserAvatar(); } catch (eAv) {}
     if (showLobby) {
       try { closeSheet('clockInSheet'); } catch (e) {}
-      renderChannelsList();
+      try { setLobbyTab('yours'); } catch (eTab) { renderChannelsList(); }
     }
+  }
+  function setLobbyTab(tab) {
+    const want = (tab === 'public' || tab === 'create') ? tab : 'yours';
+    document.querySelectorAll('.lobby-tab').forEach((btn) => {
+      const on = btn.getAttribute('data-lobby-tab') === want;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.lobby-panel').forEach((panel) => {
+      const on = panel.getAttribute('data-lobby-panel') === want;
+      panel.hidden = !on;
+    });
+    if (want === 'yours') renderChannelsList();
   }
   function renderChannelsList() {
     const host = document.getElementById('channelsList');
@@ -542,23 +555,58 @@
     if (!list.length) {
       const empty = document.createElement('p');
       empty.className = 'hint channels-empty';
-      empty.textContent = 'No channels yet — create one or join with a code.';
+      empty.textContent = 'No lobbies yet — Create one or join with a code.';
       host.appendChild(empty);
       return;
     }
+    const MAX_MEMBERS = 8;
     list.forEach((ch) => {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'channel-row';
+      row.setAttribute('role', 'listitem');
+
+      const thumb = document.createElement('span');
+      thumb.className = 'channel-row-thumb';
+      thumb.setAttribute('aria-hidden', 'true');
+
+      const main = document.createElement('span');
+      main.className = 'channel-row-main';
       const title = document.createElement('span');
       title.className = 'channel-row-name';
       title.textContent = ch.name || ch.id;
-      const meta = document.createElement('span');
-      meta.className = 'channel-row-meta';
-      const n = (ch.members && ch.members.length) || 1;
-      meta.textContent = ch.id + (ch.purpose ? (' · ' + ch.purpose) : '') + ' · ' + n + (n === 1 ? ' member' : ' members');
-      row.appendChild(title);
-      row.appendChild(meta);
+      const yours = document.createElement('span');
+      yours.className = 'channel-row-yours';
+      yours.textContent = 'Yours';
+      const codeLabel = document.createElement('span');
+      codeLabel.className = 'channel-row-code-label';
+      codeLabel.textContent = 'Code';
+      const code = document.createElement('span');
+      code.className = 'channel-row-code';
+      code.textContent = String(ch.id || '').toUpperCase();
+      main.appendChild(title);
+      main.appendChild(yours);
+      main.appendChild(codeLabel);
+      main.appendChild(code);
+
+      const side = document.createElement('span');
+      side.className = 'channel-row-side';
+      const n = Math.min(MAX_MEMBERS, Math.max(1, (ch.members && ch.members.length) || 1));
+      const members = document.createElement('span');
+      members.className = 'channel-row-members';
+      members.textContent = n + ' / ' + MAX_MEMBERS;
+      side.appendChild(members);
+      /* Live when the lobby has at least one member (local dir = yours) */
+      if (n >= 1) {
+        const live = document.createElement('span');
+        live.className = 'channel-row-live';
+        live.textContent = 'Live';
+        side.appendChild(live);
+      }
+
+      row.appendChild(thumb);
+      row.appendChild(main);
+      row.appendChild(side);
       row.addEventListener('click', () => enterChannel(ch.id));
       host.appendChild(row);
     });
@@ -653,14 +701,25 @@
   function createChannel() {
     if (!googleSignedIn()) return;
     let name = '';
-    try {
-      name = (window.prompt('Channel name', 'My map') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    } catch (e) { name = ''; }
+    const nameInput = document.getElementById('channelCreateName');
+    if (nameInput && String(nameInput.value || '').trim()) {
+      name = String(nameInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    } else {
+      try {
+        name = (window.prompt('Channel name', 'My map') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      } catch (e) { name = ''; }
+    }
     if (!name) {
       ui.toast('Name required');
       return;
     }
-    const purpose = pickChannelPurpose();
+    let purpose = '';
+    const purposeEl = document.querySelector('input[name="channelCreatePurpose"]:checked');
+    if (purposeEl && LAYOUT_PRESETS[purposeEl.value]) {
+      purpose = purposeEl.value;
+    } else {
+      purpose = pickChannelPurpose();
+    }
     if (!purpose) return;
     const id = mintChannelId();
     const me = currentUserId();
@@ -675,6 +734,8 @@
     addSelfToChannel(ch);
     upsertChannel(ch);
     try { localStorage.setItem(LAYOUT_KEY, purpose); } catch (e) {}
+    if (nameInput) nameInput.value = '';
+    try { setLobbyTab('yours'); } catch (eTab) {}
     enterChannel(id);
     ui.toast('Created · ' + purpose + ' · code ' + id);
   }
@@ -725,7 +786,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=58: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=58/59: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -929,7 +990,7 @@
     return '<span class="pin-letter">' + escHtml(pinLetter(type)) + '</span>';
   }
   function renderLeftChannelLists() {
-    /* ?v=58: maps/channels not listed in side rail — Lobbies only */
+    /* ?v=58/59: maps/channels not listed in side rail — Lobbies only */
   }
 
   /* Nav: Nominatim geocode + OSRM route (free, no API key) */
@@ -5575,6 +5636,13 @@
     if (joinInput) joinInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') joinChannelFromForm();
     });
+    document.querySelectorAll('.lobby-tab').forEach((btn) => {
+      btn.addEventListener('click', () => setLobbyTab(btn.getAttribute('data-lobby-tab')));
+    });
+    const createName = document.getElementById('channelCreateName');
+    if (createName) createName.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') createChannel();
+    });
     const channelsBtn = document.getElementById('channelsBtn');
     if (channelsBtn) channelsBtn.addEventListener('click', () => openChannelsLobby());
     const layoutChangeBtn = document.getElementById('layoutChangeBtn');
@@ -5719,8 +5787,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v58').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=58')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v59').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=59')).catch(() => {});
   }
 
   function showBootError(msg) {
