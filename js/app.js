@@ -5960,7 +5960,7 @@
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
       Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=65')).catch(() => {});
+    ).then(() => navigator.serviceWorker.register('sw.js?v=66')).catch(() => {});
   }
 
   function showBootError(msg) {

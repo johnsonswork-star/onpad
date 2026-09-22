@@ -1,4 +1,4 @@
-/* OnPad chat shell draft — localStorage first; optional MQTT. Does not alter map/lobby architecture. */
+/* OnPad chat shell — Inbox (inbound DMs) + Global/Local/Lobby. localStorage first; optional MQTT. */
 (function () {
   'use strict';
 
@@ -13,13 +13,14 @@
   ];
 
   let open = false;
-  let tab = 'global'; /* global | local | lobby | dm */
-  let dmPeer = null; /* peer id when in DM thread */
+  let tab = 'global'; /* global | local | lobby | dm (Inbox UI) */
+  let dmPeer = null; /* peer id when in Inbox thread */
   let mqttClient = null;
   let mqttAlive = false;
   let mqttTopic = '';
   let pollTimer = null;
   let lastLocalChannelKey = null;
+  let inboxMigrated = false;
 
   function $(id) { return document.getElementById(id); }
 
@@ -39,6 +40,7 @@
     return 'You';
   }
 
+  /** Prefer OnPadAccount.userId() for “me”. */
   function userId() {
     try {
       const acc = window.OnPadAccount;
@@ -107,6 +109,31 @@
     return 'chat:dm:' + pair;
   }
 
+  /** Resolve the other party in chat:dm:* for signed-in me. */
+  function peerFromDmChannel(channelKey, me) {
+    if (!channelKey || String(channelKey).indexOf('chat:dm:') !== 0) return null;
+    const rest = String(channelKey).slice('chat:dm:'.length);
+    const meS = String(me || '');
+    if (!meS || !rest) return null;
+    const parts = rest.split(':');
+    if (parts.length === 2) {
+      if (parts[0] === meS) return parts[1] || null;
+      if (parts[1] === meS) return parts[0] || null;
+      return null;
+    }
+    const prefix = meS + ':';
+    const suffix = ':' + meS;
+    if (rest.indexOf(prefix) === 0) {
+      const peer = rest.slice(prefix.length);
+      return peer || null;
+    }
+    if (rest.length > suffix.length && rest.slice(-suffix.length) === suffix) {
+      const peer = rest.slice(0, -suffix.length);
+      return peer || null;
+    }
+    return null;
+  }
+
   function storageKey(channelKey) {
     return LS_PREFIX + channelKey;
   }
@@ -147,10 +174,83 @@
   function touchDmPeer(peerId, peerName) {
     const id = String(peerId || '').trim();
     if (!id) return;
+    const me = userId();
+    if (id === me) return;
     const name = String(peerName || id).trim().slice(0, 80);
     let list = loadDmIndex().filter((r) => r && r.id !== id);
     list.unshift({ id: id, name: name, at: Date.now() });
     saveDmIndex(list.slice(0, 50));
+  }
+
+  /**
+   * Migrate/read old chat:dm:* localStorage threads that involve me.
+   * Inbox = inbound (messages from other users) + known threads you can reply to.
+   */
+  function migrateInboxFromStorage() {
+    if (inboxMigrated) return;
+    inboxMigrated = true;
+    const me = userId();
+    const byId = {};
+    loadDmIndex().forEach((r) => {
+      if (!r || !r.id || r.id === me) return;
+      byId[r.id] = { id: r.id, name: r.name || r.id, at: r.at || 0 };
+    });
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf(LS_PREFIX + 'chat:dm:') !== 0) continue;
+        const channelKey = k.slice(LS_PREFIX.length);
+        const peer = peerFromDmChannel(channelKey, me);
+        if (!peer || peer === me) continue;
+        const msgs = loadMessages(channelKey);
+        let at = 0;
+        let name = peer;
+        let inbound = false;
+        msgs.forEach((m) => {
+          if (!m) return;
+          const ts = Number(m.ts) || 0;
+          if (ts > at) at = ts;
+          if (m.uid && String(m.uid) !== me) {
+            inbound = true;
+            if (m.name) name = String(m.name).slice(0, 80);
+          }
+        });
+        if (!msgs.length && !byId[peer]) continue;
+        const prev = byId[peer];
+        byId[peer] = {
+          id: peer,
+          name: (prev && prev.name) || name,
+          at: Math.max((prev && prev.at) || 0, at),
+          inbound: inbound || !!(prev && prev.inbound)
+        };
+      }
+    } catch (e) { /* ignore */ }
+    /* Prefer inbound threads; keep index peers that already exist (no invented users). */
+    const list = Object.keys(byId).map((id) => byId[id])
+      .filter((r) => {
+        if (r.inbound) return true;
+        const key = dmChannelKey(me, r.id);
+        const msgs = loadMessages(key);
+        return msgs.some((m) => m && m.uid && String(m.uid) !== me) || msgs.length > 0;
+      })
+      .sort((a, b) => (b.at || 0) - (a.at || 0))
+      .slice(0, 50)
+      .map((r) => ({ id: r.id, name: r.name, at: r.at || 0 }));
+    if (list.length) saveDmIndex(list);
+  }
+
+  function inboxThreadList() {
+    migrateInboxFromStorage();
+    const me = userId();
+    const out = [];
+    const seen = {};
+    loadDmIndex().forEach((r) => {
+      if (!r || !r.id || r.id === me || seen[r.id]) return;
+      seen[r.id] = true;
+      out.push({ id: r.id, name: r.name || r.id, at: r.at || 0 });
+    });
+    out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    return out;
   }
 
   function formatTime(ts) {
@@ -249,7 +349,11 @@
     if (!el) return;
     const key = channelKeyForTab(tab);
     if (tab === 'dm' && !dmPeer) {
-      el.textContent = 'DMs';
+      el.textContent = 'Inbox';
+      return;
+    }
+    if (tab === 'dm' && dmPeer) {
+      el.textContent = 'Inbox · ' + dmPeer;
       return;
     }
     el.textContent = key || '—';
@@ -273,7 +377,9 @@
     if (!list.length) {
       const empty = document.createElement('p');
       empty.className = 'chat-empty';
-      empty.textContent = 'No messages yet. Say something.';
+      empty.textContent = tab === 'dm'
+        ? 'No messages in this thread yet. Reply below.'
+        : 'No messages yet. Say something.';
       host.appendChild(empty);
       return;
     }
@@ -301,60 +407,35 @@
     host.scrollTop = host.scrollHeight;
   }
 
-  function renderDmList() {
+  /** Inbox: list inbound / known DM threads to you — no blank DM room, no fake users. */
+  function renderInboxList() {
     const host = $('chatDmList');
     if (!host) return;
     host.innerHTML = '';
-    const list = loadDmIndex();
+    const list = inboxThreadList();
     if (!list.length) {
       const empty = document.createElement('p');
       empty.className = 'chat-empty';
-      empty.textContent = 'No DMs yet. v1 stub — start a thread below.';
+      empty.textContent = 'No messages to you yet. Inbox shows direct messages from other users.';
       host.appendChild(empty);
-    } else {
-      list.forEach((r) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'chat-dm-row';
-        btn.textContent = r.name || r.id;
-        btn.addEventListener('click', () => {
-          dmPeer = r.id;
-          setTab('dm');
-        });
-        host.appendChild(btn);
-      });
+      return;
     }
-    const starter = document.createElement('div');
-    starter.className = 'chat-dm-start';
-    const input = document.createElement('input');
-    input.className = 'chat-dm-peer-input';
-    input.type = 'text';
-    input.placeholder = 'Peer id (stub)';
-    input.autocomplete = 'off';
-    input.setAttribute('enterkeyhint', 'go');
-    const go = document.createElement('button');
-    go.type = 'button';
-    go.className = 'chat-dm-start-btn';
-    go.textContent = 'Open';
-    const openPeer = () => {
-      const id = (input.value || '').trim();
-      if (!id) return;
-      touchDmPeer(id, id);
-      dmPeer = id;
-      setTab('dm');
-    };
-    go.addEventListener('click', openPeer);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); openPeer(); }
+    list.forEach((r) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chat-dm-row';
+      btn.textContent = r.name || r.id;
+      btn.addEventListener('click', () => {
+        dmPeer = r.id;
+        setTab('dm');
+      });
+      host.appendChild(btn);
     });
-    starter.appendChild(input);
-    starter.appendChild(go);
-    host.appendChild(starter);
   }
 
   function render() {
     refreshLobbyTabState();
-    if (tab === 'dm' && !dmPeer) renderDmList();
+    if (tab === 'dm' && !dmPeer) renderInboxList();
     else renderMessages();
     updateChannelLabel();
   }
@@ -396,8 +477,10 @@
     try {
       const msg = JSON.parse(buf.toString());
       if (!msg || !msg.id || !msg.channel || !msg.text) return;
-      if (msg.uid === userId()) return; /* already stored locally */
-      const list = loadMessages(msg.channel);
+      const me = userId();
+      if (msg.uid === me) return; /* already stored locally */
+      const channel = String(msg.channel);
+      const list = loadMessages(channel);
       if (list.some((m) => m.id === msg.id)) return;
       list.push({
         id: String(msg.id),
@@ -405,10 +488,16 @@
         name: String(msg.name || 'Operator').slice(0, 80),
         text: String(msg.text).slice(0, 500),
         ts: Number(msg.ts) || Date.now(),
-        channel: String(msg.channel)
+        channel: channel
       });
-      saveMessages(msg.channel, list);
-      if (channelKeyForTab(tab) === msg.channel) renderMessages();
+      saveMessages(channel, list);
+      /* Inbound DM → Inbox index */
+      if (channel.indexOf('chat:dm:') === 0) {
+        const peer = peerFromDmChannel(channel, me);
+        if (peer) touchDmPeer(peer, msg.name || peer);
+      }
+      if (channelKeyForTab(tab) === channel) renderMessages();
+      else if (tab === 'dm' && !dmPeer) renderInboxList();
     } catch (e) { /* ignore */ }
   }
 
@@ -519,8 +608,9 @@
 
   function init() {
     if (!$('chatShell') || !$('chatToggle')) return;
+    migrateInboxFromStorage();
     wireUi();
-    setOpen(false); /* default collapsed — map stays clear */
+    setOpen(false); /* default collapsed — map stays clear; toggle stays bottom-right */
     setTab('global');
     refreshLobbyTabState();
     startPoll();
@@ -537,6 +627,7 @@
     channelKeyForTab: channelKeyForTab,
     readMapMode: readMapMode,
     townId: townId,
+    userId: userId,
     open: () => setOpen(true),
     close: () => setOpen(false),
     setTab: setTab
