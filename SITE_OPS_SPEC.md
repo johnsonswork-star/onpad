@@ -32,7 +32,12 @@ Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, s
 - CHANNELS control on the map returns to the lobby without signing out.
 - Deep link: `?ch=CODE`.
 
-### Everyday mock chrome (?v=57)
+#
+## Maps via Lobbies (?v=58)
+
+Solo and channel maps are **not** listed in the left sidebar / everyday rail. Open them only through the **Lobbies** button (lobby screen: Solo / create / join / your channels). Everyday pin tools stay in the rail.
+
+## Everyday mock chrome (?v=57)
 
 When layout/purpose is **Everyday** (Solo map OR channel created with Everyday purpose), use the Chris mock chrome: transparent topbar (no haze), avatar + Search map: only, collapsed left › rail, short pin name + ▲▼ chips, blank bottom. Excavation purpose/layout keeps shift/truck bottom and excavation tools. Chrome is driven by `body.everyday-chrome` from layout id, not Solo-only.
 

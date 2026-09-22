@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=57" />
+  <link rel="stylesheet" href="css/app.css?v=58" />
 </head>
 <body>
   <div id="app">
@@ -60,11 +60,9 @@
     <!-- LEFT: equipment / machine actions -->
     <aside id="leftRail" class="rail rail-left" aria-label="Machine tools">
       <div class="rail-panel">
-        <div class="rail-section" aria-label="Channels">
-          <span class="rail-label">Channels</span>
-          <div id="leftChannelListEx" class="left-channel-list"></div>
-          <button type="button" id="leftSoloBtnEx" class="channel-mini-btn">Solo</button>
-          <button type="button" id="leftLobbyBtnEx" class="channel-mini-btn">Lobby</button>
+        <div class="rail-section" aria-label="Lobbies">
+          <span class="rail-label">Maps</span>
+          <button type="button" id="leftLobbyBtnEx" class="channel-mini-btn">Lobbies</button>
         </div>
         <div class="rail-section" aria-label="Place machine">
           <span class="rail-label">Machine</span>
@@ -192,13 +190,11 @@
     </div>
 
     <!-- BOTTOM: truck / haul path tools -->
-    <aside id="everydayRail" class="rail rail-left everyday-rail" aria-label="Channels and places" hidden>
+    <aside id="everydayRail" class="rail rail-left everyday-rail" aria-label="Places" hidden>
       <div class="rail-panel">
-        <div class="rail-section" aria-label="Channels">
-          <span class="rail-label">Channels</span>
-          <div id="leftChannelList" class="left-channel-list"></div>
-          <button type="button" id="leftSoloBtn" class="channel-mini-btn">Solo</button>
-          <button type="button" id="leftLobbyBtn" class="channel-mini-btn">Lobby</button>
+        <div class="rail-section" aria-label="Lobbies">
+          <span class="rail-label">Maps</span>
+          <button type="button" id="leftLobbyBtn" class="channel-mini-btn">Lobbies</button>
         </div>
         <div class="rail-section" aria-label="Places">
           <span class="rail-label">Places</span>
@@ -276,8 +272,8 @@
           <div id="channelsUserEmail" class="channels-user-email"></div>
         </div>
       </div>
-      <h1 class="channels-title">Channels</h1>
-      <p class="channels-copy">Pick Solo or a shared channel map. Create or join with a code.</p>
+      <h1 class="channels-title">Lobbies</h1>
+      <p class="channels-copy">Open Solo or a shared channel map here. Create or join with a code. Maps are not listed in the side rail.</p>
       <button type="button" id="channelsSoloBtn" class="fat primary">Solo map</button>
       <button type="button" id="channelsCreateBtn" class="fat">Create channel</button>
       <div class="channels-join-row">
@@ -479,6 +475,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=57"></script>
+  <script src="js/app.js?v=58"></script>
 </body>
 </html>

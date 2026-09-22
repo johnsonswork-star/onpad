@@ -517,7 +517,7 @@
     if (back) {
       /* Everyday chrome: CHANNELS/LEAVE via left › rail — not top strip */
       back.hidden = !(inGoogle && isMapOpen()) || everydayChrome;
-      back.textContent = mapMode === 'channel' ? 'LEAVE' : 'CHANNELS';
+      back.textContent = mapMode === 'channel' ? 'LEAVE' : 'Lobbies';
     }
     const chChip = document.getElementById('channelChip');
     if (chChip && everydayChrome) chChip.hidden = true;
@@ -725,7 +725,7 @@
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=57: do NOT force lobby. Restore last map, else Solo.
+    /* Chris revise ?v=58: do NOT force lobby. Restore last map, else Solo.
        CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
@@ -929,19 +929,7 @@
     return '<span class="pin-letter">' + escHtml(pinLetter(type)) + '</span>';
   }
   function renderLeftChannelLists() {
-    ['leftChannelList', 'leftChannelListEx'].forEach((hid) => {
-      const host = document.getElementById(hid);
-      if (!host) return;
-      host.innerHTML = '';
-      loadChannelDir().forEach((ch) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'left-channel-item' + (mapMode === 'channel' && activeChannelId === ch.id ? ' active' : '');
-        b.textContent = (ch.name || ch.id) + ' · ' + ch.id;
-        b.addEventListener('click', () => enterChannel(ch.id));
-        host.appendChild(b);
-      });
-    });
+    /* ?v=58: maps/channels not listed in side rail — Lobbies only */
   }
 
   /* Nav: Nominatim geocode + OSRM route (free, no API key) */
@@ -2709,7 +2697,7 @@
     if (!Array.isArray(state.likes)) state.likes = [];
     return state.likes;
   }
-  /* ---- SITE OPS ?v=57: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
+  /* ---- SITE OPS ?v=58: scores, stealth mod tools, L3+ report queue (Chris override) ---- */
   const MOD_TOOLS_SESSION_KEY = 'onpad:modToolsOn';
   const MS_24H = 24 * 60 * 60 * 1000;
   const RESTRICT_ACTIONS = {
@@ -5618,10 +5606,6 @@
         try { document.getElementById('roleBtn').click(); } catch (e) {}
       }
     });
-    ['leftSoloBtn', 'leftSoloBtnEx'].forEach((id) => {
-      const b = document.getElementById(id);
-      if (b) b.addEventListener('click', () => enterSolo());
-    });
     ['leftLobbyBtn', 'leftLobbyBtnEx'].forEach((id) => {
       const b = document.getElementById(id);
       if (b) b.addEventListener('click', () => openChannelsLobby());
@@ -5735,8 +5719,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v57').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=57')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v58').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=58')).catch(() => {});
   }
 
   function showBootError(msg) {

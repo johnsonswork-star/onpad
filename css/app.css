@@ -86,7 +86,7 @@ body.truck-open .leaflet-bottom {
   align-items: center;
   gap: 8px;
   padding: calc(8px + var(--safe-t)) 10px 8px;
-  /* No top vignette — map stays full brightness under chrome (Chris ?v=57) */
+  /* No top vignette — map stays full brightness under chrome (Chris ?v=58) */
   background: transparent;
   pointer-events: none;
 }
@@ -1884,7 +1884,7 @@ body.on-shift #shiftBar:not([hidden]) { display: flex; }
 .report-q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 
-/* Layout picker + Everyday rail (?v=57) */
+/* Layout picker + Everyday rail (?v=58) */
 .layout-gate {
   position: fixed;
   inset: 0;
@@ -1989,7 +1989,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .layout-btn, .layout-chip { text-transform: uppercase; letter-spacing: 0.04em; }
 
 
-/* Top nav strip — search / speed / directions (?v=57) */
+/* Top nav strip — search / speed / directions (?v=58) */
 #topbar {
   flex-wrap: wrap;
   gap: 6px 8px;
@@ -2040,6 +2040,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .speed-badge, .nav-eta-badge, .nav-dir-btn, .nav-clear-btn {
   white-space: nowrap;
 }
+/* maps via Lobbies only (?v=58) */
 .left-channel-list {
   display: flex;
   flex-direction: column;
@@ -2068,7 +2069,7 @@ body.layout-excavation #everydayRail { display: none !important; }
 .channel-mini-btn { margin-bottom: 4px; font-weight: 700; }
 
 
-/* Purpose-aware bottom chrome (?v=57) */
+/* Purpose-aware bottom chrome (?v=58) */
 body.map-solo #shiftBar,
 body.map-solo #truckBar,
 body.map-solo #clockInSheet,
@@ -2086,7 +2087,7 @@ body.purpose-blank-bottom.shift-gated .tool {
 }
 
 
-/* Compact Maps-style topbar (?v=57) */
+/* Compact Maps-style topbar (?v=58) */
 #topbar {
   display: flex;
   flex-wrap: nowrap;
@@ -2206,7 +2207,7 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* P3 marker scores ▲▼ (?v=57) */
+/* P3 marker scores ▲▼ (?v=58) */
 .marker-score {
   margin-top: 1px;
   max-width: 94px;
@@ -2241,7 +2242,7 @@ body:not(.map-open) #topbar .nav-extra {
 }
 
 
-/* Everyday mock chrome — Solo OR channel Everyday purpose (?v=57) */
+/* Everyday mock chrome — Solo OR channel Everyday purpose (?v=58) */
 body.everyday-chrome .identity-meta,
 body.everyday-chrome #navMoreBtn,
 body.everyday-chrome #navExtra,
