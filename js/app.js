@@ -474,29 +474,24 @@
     saveChannelDir(list);
   }
   function canDeleteChannel(ch) {
-    if (!ch) return false;
-    const me = currentUserId();
-    if (!me) return false;
-    /* Creator, or local "Yours" dir entry with no creator recorded */
-    if (ch.createdBy && String(ch.createdBy) === String(me)) return true;
-    if (!ch.createdBy) return true;
-    return false;
+    /* Yours list = local directory — any listed lobby can be removed here */
+    return !!(ch && ch.id);
   }
-  function deleteChannel(id) {
+  function deleteChannel(id, opts) {
     const code = String(id || '').trim().toUpperCase().replace(/^CH-/, '');
     if (!code) return;
     const ch = findChannel(code);
-    if (!ch) { ui.toast('Map not found'); return; }
+    if (!ch) { ui.toast('Map not found'); try { renderChannelsList(); } catch (e) {} return; }
     if (!canDeleteChannel(ch)) {
-      ui.toast('Only the creator can delete this map');
+      ui.toast('Cannot delete this map');
+      return;
+    }
+    /* In-sheet confirm only — window.confirm fails in some WebViews / QA */
+    if (!(opts && opts.confirmed)) {
+      ui.toast('Tap Confirm delete');
       return;
     }
     const label = ch.name || code;
-    let ok = false;
-    try {
-      ok = window.confirm('Delete map "' + label + '" (' + code + ')? This cannot be undone.');
-    } catch (e) { ok = false; }
-    if (!ok) return;
     const list = loadChannelDir().filter((c) => !(c && String(c.id).toUpperCase() === code));
     saveChannelDir(list);
     /* Drop lobby-local job blob */
@@ -667,17 +662,46 @@
       row.addEventListener('click', () => enterChannel(ch.id));
       host.appendChild(row);
       if (canDeleteChannel(ch)) {
+        const actions = document.createElement('div');
+        actions.className = 'channel-row-actions';
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'channel-row-delete';
         del.textContent = 'Delete';
         del.setAttribute('aria-label', 'Delete map ' + (ch.name || ch.id));
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.className = 'channel-row-delete-confirm';
+        confirmBtn.textContent = 'Confirm delete';
+        confirmBtn.hidden = true;
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'channel-row-delete-cancel';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.hidden = true;
         del.addEventListener('click', (ev) => {
           ev.preventDefault();
           ev.stopPropagation();
-          deleteChannel(ch.id);
+          del.hidden = true;
+          confirmBtn.hidden = false;
+          cancelBtn.hidden = false;
         });
-        host.appendChild(del);
+        confirmBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          deleteChannel(ch.id, { confirmed: true });
+        });
+        cancelBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          del.hidden = false;
+          confirmBtn.hidden = true;
+          cancelBtn.hidden = true;
+        });
+        actions.appendChild(del);
+        actions.appendChild(confirmBtn);
+        actions.appendChild(cancelBtn);
+        host.appendChild(actions);
       }
     });
   }
@@ -5968,7 +5992,7 @@
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
       Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=67')).catch(() => {});
+    ).then(() => navigator.serviceWorker.register('sw.js?v=68')).catch(() => {});
   }
 
   function showBootError(msg) {
