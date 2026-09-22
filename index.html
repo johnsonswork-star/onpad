@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=61" />
+  <link rel="stylesheet" href="css/app.css?v=62" />
 </head>
 <body>
   <div id="app">
@@ -503,9 +503,44 @@
     </div>
   </div>
 
+
+  <!-- Chat shell (collapsed by default) -->
+  <button type="button" id="chatToggle" class="chat-toggle" aria-expanded="false" aria-controls="chatShell" title="Show chat">
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <path d="M8 12h32v22H18l-8 8V12z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M16 22h16M16 28h10" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+    </svg>
+    <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Chat</span>
+  </button>
+  <div id="chatShell" class="chat-shell" hidden role="dialog" aria-label="OnPad chat">
+    <div class="chat-head">
+      <button type="button" id="chatDmBack" class="chat-dm-back" hidden>Back</button>
+      <div class="chat-head-title">
+        Chat
+        <span id="chatChannelLabel" class="chat-channel-label">chat:global</span>
+      </div>
+      <button type="button" id="chatHideBtn" class="chat-hide-btn" title="Hide chat">Hide</button>
+    </div>
+    <div class="chat-tabs" role="tablist" aria-label="Chat channels">
+      <button type="button" class="chat-tab is-active" role="tab" data-chat-tab="global" aria-selected="true">Global</button>
+      <button type="button" class="chat-tab" role="tab" data-chat-tab="local" aria-selected="false">Local</button>
+      <button type="button" class="chat-tab is-disabled" role="tab" data-chat-tab="lobby" aria-selected="false" disabled aria-disabled="true" title="Lobby chat — join a CH-* channel first">Lobby</button>
+      <button type="button" class="chat-tab" role="tab" data-chat-tab="dm" aria-selected="false">DM</button>
+    </div>
+    <div class="chat-body">
+      <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+      <div id="chatDmList" class="chat-dm-list" hidden></div>
+    </div>
+    <form id="chatCompose" class="chat-compose" autocomplete="off">
+      <input id="chatInput" class="chat-input" type="text" maxlength="500" placeholder="Message…" enterkeyhint="send" aria-label="Chat message" />
+      <button type="submit" class="chat-send">Send</button>
+    </form>
+  </div>
+
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=61"></script>
+  <script src="js/app.js?v=62"></script>
+  <script src="js/chat.js?v=62"></script>
 </body>
 </html>
