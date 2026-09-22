@@ -2854,3 +2854,20 @@ body.everyday-chrome #everydayRail:not(.open) .rail-panel {
     bottom: calc(10px + var(--safe-b));
   }
 }
+
+
+/* Delete created lobby maps (?v=63) */
+.channel-row-delete {
+  display: block;
+  width: 100%;
+  margin: -4px 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #c4a484;
+  background: #f7efe4;
+  color: #8b3a2a;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.channel-row-delete:active { background: #f0e0d0; }

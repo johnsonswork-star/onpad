@@ -1,3 +1,7 @@
+## Delete maps (?v=63)
+
+From Lobbies → Yours, creators can **Delete** a map (confirm). Removes it from the local channel directory and drops lobby-local storage. World map is never deleted this way. If you were inside that lobby, you return to World.
+
 # Site Ops Spec
 Copy this file into the project as the source of truth for map, roles, social scores, profiles, and mod tools.
 

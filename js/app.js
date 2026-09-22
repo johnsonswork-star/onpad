@@ -473,6 +473,51 @@
     else list.unshift(ch);
     saveChannelDir(list);
   }
+  function canDeleteChannel(ch) {
+    if (!ch) return false;
+    const me = currentUserId();
+    if (!me) return false;
+    /* Creator, or local "Yours" dir entry with no creator recorded */
+    if (ch.createdBy && String(ch.createdBy) === String(me)) return true;
+    if (!ch.createdBy) return true;
+    return false;
+  }
+  function deleteChannel(id) {
+    const code = String(id || '').trim().toUpperCase().replace(/^CH-/, '');
+    if (!code) return;
+    const ch = findChannel(code);
+    if (!ch) { ui.toast('Map not found'); return; }
+    if (!canDeleteChannel(ch)) {
+      ui.toast('Only the creator can delete this map');
+      return;
+    }
+    const label = ch.name || code;
+    let ok = false;
+    try {
+      ok = window.confirm('Delete map "' + label + '" (' + code + ')? This cannot be undone.');
+    } catch (e) { ok = false; }
+    if (!ok) return;
+    const list = loadChannelDir().filter((c) => !(c && String(c.id).toUpperCase() === code));
+    saveChannelDir(list);
+    /* Drop lobby-local job blob */
+    try {
+      const room = channelRoomCode(code);
+      localStorage.removeItem('onpad:job:' + room);
+      localStorage.removeItem('onpad:job:' + room.toLowerCase());
+      /* legacy keys if any */
+      Object.keys(localStorage).forEach((k) => {
+        if (k && k.indexOf(room) >= 0 && k.indexOf('onpad:') === 0) {
+          try { localStorage.removeItem(k); } catch (e2) {}
+        }
+      });
+    } catch (e3) {}
+    if (mapMode === 'channel' && String(activeChannelId || '').toUpperCase() === code) {
+      try { clearSelfPresence(false); } catch (e4) {}
+      enterSolo();
+    }
+    try { renderChannelsList(); } catch (e5) {}
+    ui.toast('Deleted · ' + label);
+  }
   function addSelfToChannel(ch) {
     if (!ch) return ch;
     const me = currentUserId();
@@ -611,6 +656,19 @@
       row.appendChild(side);
       row.addEventListener('click', () => enterChannel(ch.id));
       host.appendChild(row);
+      if (canDeleteChannel(ch)) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'channel-row-delete';
+        del.textContent = 'Delete';
+        del.setAttribute('aria-label', 'Delete map ' + (ch.name || ch.id));
+        del.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          deleteChannel(ch.id);
+        });
+        host.appendChild(del);
+      }
     });
   }
   function enterSolo() {
@@ -5902,7 +5960,7 @@
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
       Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=62')).catch(() => {});
+    ).then(() => navigator.serviceWorker.register('sw.js?v=63')).catch(() => {});
   }
 
   function showBootError(msg) {
