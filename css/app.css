@@ -2856,7 +2856,7 @@ body.everyday-chrome #everydayRail:not(.open) .rail-panel {
 }
 
 
-/* Delete created lobby maps (?v=63) */
+/* Delete created lobby maps (?v=65) */
 .channel-row-delete {
   display: block;
   width: 100%;

@@ -760,27 +760,27 @@
   }
   function createChannel() {
     if (!googleSignedIn()) return;
-    let name = '';
+    /* Name + purpose only from Create tab — never a second prompt screen */
     const nameInput = document.getElementById('channelCreateName');
-    if (nameInput && String(nameInput.value || '').trim()) {
-      name = String(nameInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    } else {
-      try {
-        name = (window.prompt('Channel name', 'My map') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-      } catch (e) { name = ''; }
-    }
+    const name = nameInput
+      ? String(nameInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+      : '';
     if (!name) {
-      ui.toast('Name required');
+      ui.toast('Enter a lobby name');
+      try { setLobbyTab('create'); } catch (eTab) {}
+      try { if (nameInput) nameInput.focus(); } catch (eF) {}
       return;
     }
-    let purpose = '';
+    let purpose = 'everyday';
     const purposeEl = document.querySelector('input[name="channelCreatePurpose"]:checked');
     if (purposeEl && LAYOUT_PRESETS[purposeEl.value]) {
       purpose = purposeEl.value;
-    } else {
-      purpose = pickChannelPurpose();
     }
-    if (!purpose) return;
+    if (!LAYOUT_PRESETS[purpose]) {
+      ui.toast('Pick Everyday or Excavation');
+      try { setLobbyTab('create'); } catch (eTab2) {}
+      return;
+    }
     const id = mintChannelId();
     const me = currentUserId();
     const ch = {
@@ -5960,7 +5960,7 @@
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
       Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=63')).catch(() => {});
+    ).then(() => navigator.serviceWorker.register('sw.js?v=65')).catch(() => {});
   }
 
   function showBootError(msg) {
