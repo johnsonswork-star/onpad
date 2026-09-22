@@ -3588,6 +3588,28 @@
     return fallback || emptyState(code);
   }
 
+
+  /* Town id for Local chat (OnPad Chat) — coarse grid until real towns */
+  function townIdFromLatLng(lat, lng) {
+    if (lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return 'unknown';
+    const rLat = Math.round(lat * 20) / 20; /* ~5.5 km */
+    const rLng = Math.round(lng * 20) / 20;
+    return 't_' + rLat.toFixed(2) + '_' + rLng.toFixed(2);
+  }
+  function currentTownId() {
+    try {
+      const pos = PositionSource && PositionSource.getLatLng && PositionSource.getLatLng();
+      if (pos && pos.lat != null) return townIdFromLatLng(pos.lat, pos.lng);
+    } catch (e) {}
+    return 'unknown';
+  }
+  try {
+    window.OnPadTown = {
+      id: function () { return currentTownId(); },
+      fromLatLng: townIdFromLatLng
+    };
+  } catch (eOt) {}
+
   /* ---- World map + lobby-local overlays (?v=61) ----
      World store = SITE (SOLO_SITE). Lobby edits write only to CH-{id}.
      In channel mode, draw World features as a read-only base under lobby features. */
