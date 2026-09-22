@@ -5,10 +5,11 @@
   const VERSION = 1;
   const SOLO_SITE = 'SITE'; /* Close/Solo = today's shared solo map */
   let activeSite = SOLO_SITE;
-  let mapMode = 'lobby'; /* lobby | solo | channel */
+  let mapMode = 'solo'; /* lobby | solo | channel — lobby is opt-in overlay, not cold-open */
   let activeChannelId = '';
   const CHANNELS_KEY = 'onpad:channels';
   const MAP_MODE_KEY = 'onpad:mapMode';
+  let mapModeBeforeLobby = { mode: 'solo', id: '' };
 
   const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const M_PER_DEG = 111320;
@@ -749,7 +750,11 @@
       syncAuthGate();
       return;
     }
-    /* Leave channel/solo — drop presence in current room, then lobby */
+    /* Stash last map — lobby is opt-in only; never persist mode:lobby (cold open stays map) */
+    mapModeBeforeLobby = {
+      mode: (mapMode === 'channel' && activeChannelId) ? 'channel' : 'solo',
+      id: (mapMode === 'channel' && activeChannelId) ? activeChannelId : ''
+    };
     try {
       clearSelfPresence(false);
       persist();
@@ -759,13 +764,24 @@
     activeChannelId = '';
     activeLayoutId = '';
     activeSite = SOLO_SITE;
-    try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'lobby' })); } catch (e) {}
+    /* Do NOT write lobby to MAP_MODE_KEY — keep last solo/channel for refresh */
     applyLayoutHud();
     syncChannelsGate();
     syncLayoutGate();
     syncClockInGate();
     try { clearRoute(); } catch (e2) {}
-    ui.toast('Left map');
+  }
+  function closeChannelsLobby() {
+    if (!googleSignedIn()) {
+      syncAuthGate();
+      return;
+    }
+    const prev = mapModeBeforeLobby || { mode: 'solo', id: '' };
+    if (prev.mode === 'channel' && prev.id) {
+      enterChannel(prev.id);
+      return;
+    }
+    enterSolo();
   }
   function switchToActiveSite() {
     persist();
@@ -803,10 +819,7 @@
         return;
       }
       if (saved && saved.mode === 'lobby') {
-        mapMode = 'lobby';
-        activeChannelId = '';
-        activeSite = SOLO_SITE;
-        return;
+        /* Legacy: never cold-open into lobbies — fall through to Solo */
       }
     } catch (e) {}
     mapMode = 'solo';
@@ -5639,6 +5652,8 @@
     document.querySelectorAll('.lobby-tab').forEach((btn) => {
       btn.addEventListener('click', () => setLobbyTab(btn.getAttribute('data-lobby-tab')));
     });
+    const channelsCloseBtn = document.getElementById('channelsCloseBtn');
+    if (channelsCloseBtn) channelsCloseBtn.addEventListener('click', () => closeChannelsLobby());
     const createName = document.getElementById('channelCreateName');
     if (createName) createName.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') createChannel();
@@ -5787,8 +5802,8 @@
       const waiting = regs.map((r) => r.unregister());
       return Promise.all(waiting);
     }).then(() => caches.keys()).then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v59').map((k) => caches.delete(k)))
-    ).then(() => navigator.serviceWorker.register('sw.js?v=59')).catch(() => {});
+      Promise.all(keys.filter((k) => k.startsWith('onpad-') && k !== 'onpad-v60').map((k) => caches.delete(k)))
+    ).then(() => navigator.serviceWorker.register('sw.js?v=60')).catch(() => {});
   }
 
   function showBootError(msg) {

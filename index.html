@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=59" />
+  <link rel="stylesheet" href="css/app.css?v=60" />
 </head>
 <body>
   <div id="app">
@@ -272,7 +272,10 @@
           <div id="channelsUserEmail" class="channels-user-email"></div>
         </div>
       </div>
-      <h1 class="channels-title">Lobbies</h1>
+      <div class="lobby-header-row">
+        <h1 class="channels-title">Lobbies</h1>
+        <button type="button" id="channelsCloseBtn" class="lobby-close-btn" aria-label="Close lobbies">✕</button>
+      </div>
       <div class="lobby-tabs" role="tablist" aria-label="Lobby views">
         <button type="button" class="lobby-tab is-active" role="tab" id="lobbyTabYours" data-lobby-tab="yours" aria-selected="true" aria-controls="lobbyPanelYours">Yours</button>
         <button type="button" class="lobby-tab" role="tab" id="lobbyTabPublic" data-lobby-tab="public" aria-selected="false" aria-controls="lobbyPanelPublic">Public</button>
@@ -503,6 +506,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=59"></script>
+  <script src="js/app.js?v=60"></script>
 </body>
 </html>

@@ -1310,7 +1310,7 @@ body.auth-gated #app {
 }
 body.auth-gated #authGate { pointer-events: auto; }
 
-/* Lobbies cream modal (?v=59) */
+/* Lobbies cream modal (?v=60) */
 .channels-gate {
   position: fixed;
   inset: 0;
@@ -1341,6 +1341,27 @@ body.auth-gated #authGate { pointer-events: auto; }
   color: var(--lobby-ink);
   box-shadow: 0 18px 48px rgba(20, 40, 24, 0.28);
 }
+.lobby-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.lobby-header-row .channels-title { margin-bottom: 0; }
+.lobby-close-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #c5b8a4;
+  background: #f3eee4;
+  color: #3d4f3a;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.lobby-close-btn:active { background: #e8e0d2; }
 .channels-title {
   margin: 0 0 10px;
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
