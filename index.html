@@ -13,7 +13,7 @@
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-  <link rel="stylesheet" href="css/app.css?v=60" />
+  <link rel="stylesheet" href="css/app.css?v=61" />
 </head>
 <body>
   <div id="app">
@@ -46,7 +46,7 @@
           <span class="identity-copy"><span id="roleLabel" class="identity-role">Dozer</span></span>
         </button>
         <button type="button" id="channelsBtn" class="badge channels-btn" hidden title="Leave map / channels lobby">LEAVE</button>
-        <span id="channelChip" class="badge channel-chip" hidden title="Current map">SOLO</span>
+        <span id="channelChip" class="badge channel-chip" hidden title="Current map">WORLD</span>
         <button type="button" id="layoutChangeBtn" class="badge layout-btn" hidden title="Change layout">LAYOUT</button>
         <span id="layoutChip" class="badge layout-chip" hidden title="Current layout">—</span>
         <span id="gpsBadge" class="badge gps-off" title="GPS" hidden>GPS</span>
@@ -262,7 +262,7 @@
     </div>
   </div>
 
-  <!-- Map channels lobby — after Google; Solo = today's map -->
+  <!-- Map channels lobby — after Google; World = shared SITE map -->
   <div id="channelsGate" class="channels-gate" hidden>
     <div class="channels-card">
       <div class="channels-user-row" id="channelsUserRow" hidden>
@@ -307,7 +307,7 @@
       </div>
 
       <div class="channels-footer">
-        <button type="button" id="channelsSoloBtn" class="fat primary">Solo map</button>
+        <button type="button" id="channelsSoloBtn" class="fat primary">World map</button>
         <div class="channels-join-row">
           <input id="channelJoinInput" class="channels-join-input" type="text" inputmode="text" autocomplete="off" placeholder="Join code" maxlength="12" aria-label="Channel join code" />
           <button type="button" id="channelsJoinBtn" class="fat">Join</button>
@@ -506,6 +506,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/mqtt/mqtt.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/app.js?v=60"></script>
+  <script src="js/app.js?v=61"></script>
 </body>
 </html>

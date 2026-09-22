@@ -3,9 +3,10 @@
   'use strict';
 
   const VERSION = 1;
-  const SOLO_SITE = 'SITE'; /* Close/Solo = today's shared solo map */
+  const SOLO_SITE = 'SITE'; /* World shared map room (legacy Solo/SITE) */
+  const WORLD_SITE = SOLO_SITE; /* alias — World store = SITE */
   let activeSite = SOLO_SITE;
-  let mapMode = 'solo'; /* lobby | solo | channel — lobby is opt-in overlay, not cold-open */
+  let mapMode = 'solo'; /* lobby | solo(=world) | channel — lobby is opt-in overlay, not cold-open */
   let activeChannelId = '';
   const CHANNELS_KEY = 'onpad:channels';
   const MAP_MODE_KEY = 'onpad:mapMode';
@@ -324,7 +325,7 @@
       } catch (e) {}
       if (payload.picture) localStorage.setItem('onpad:googlePicture', String(payload.picture).slice(0, 500));
       else localStorage.removeItem('onpad:googlePicture');
-      /* Stay on / open Solo map after sign-in — CHANNELS is opt-in */
+      /* Stay on / open World map after sign-in — Lobbies is opt-in */
       if (mapMode === 'lobby' || !isMapOpen()) {
         mapMode = 'solo';
         activeChannelId = '';
@@ -508,7 +509,7 @@
         chip.textContent = (ch && ch.name) ? ch.name : activeChannelId;
       } else if (mapMode === 'solo') {
         chip.hidden = false;
-        chip.textContent = 'SOLO';
+        chip.textContent = 'WORLD';
       } else {
         chip.hidden = true;
       }
@@ -627,7 +628,7 @@
     try {
       localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'solo' }));
     } catch (e) {}
-    /* Solo default layout Everyday when unset (excavation remains opt-in via LAYOUT) */
+    /* World default layout Everyday when unset (excavation remains opt-in via LAYOUT) */
     try {
       if (!rememberedLayoutId()) localStorage.setItem(LAYOUT_KEY, 'everyday');
     } catch (e2) {}
@@ -635,7 +636,7 @@
     syncChannelsGate();
     ensureLayoutOrPicker();
     try { renderLeftChannelLists(); } catch (e3) {}
-    ui.toast('Solo map');
+    ui.toast('World map');
   }
   function enterChannel(id) {
     if (!googleSignedIn()) return;
@@ -798,12 +799,13 @@
     placeTool = null;
     pathDraft = null;
     persist();
+    try { refreshWorldOverlay(); } catch (eWo) {}
     try { renderAll(); } catch (e) {}
     retopic();
   }
   function restoreMapMode() {
-    /* Chris revise ?v=58/59: do NOT force lobby. Restore last map, else Solo.
-       CHANNELS badge stays opt-in. Deep link ?ch= in bootFromUrl. */
+    /* Chris revise ?v=58/60/61: do NOT force lobby. Restore last map, else World.
+       Lobbies opt-in. Soft: rewrite legacy {mode:lobby} → solo/world on disk. */
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_MODE_KEY) || 'null');
       if (saved && saved.mode === 'channel' && saved.id) {
@@ -819,7 +821,8 @@
         return;
       }
       if (saved && saved.mode === 'lobby') {
-        /* Legacy: never cold-open into lobbies — fall through to Solo */
+        /* Soft migrate: never cold-open lobbies; rewrite LS to World */
+        try { localStorage.setItem(MAP_MODE_KEY, JSON.stringify({ mode: 'solo' })); } catch (eRw) {}
       }
     } catch (e) {}
     mapMode = 'solo';
@@ -3585,6 +3588,42 @@
     return fallback || emptyState(code);
   }
 
+  /* ---- World map + lobby-local overlays (?v=61) ----
+     World store = SITE (SOLO_SITE). Lobby edits write only to CH-{id}.
+     In channel mode, draw World features as a read-only base under lobby features. */
+  let worldOverlay = { surfaces: [], requests: [], digPads: [], fleet: [], pins: [], paths: [] };
+  const WORLD_BAGS = ['surfaces', 'requests', 'digPads', 'fleet', 'pins', 'paths'];
+  function isWorldFeature(item) {
+    return !!(item && item._world);
+  }
+  function worldFeatureToast() {
+    ui.toast('World map feature — edit on World');
+  }
+  function refreshWorldOverlay() {
+    if (mapMode !== 'channel') {
+      worldOverlay = { surfaces: [], requests: [], digPads: [], fleet: [], pins: [], paths: [] };
+      return worldOverlay;
+    }
+    const w = loadJob(WORLD_SITE, emptyState(WORLD_SITE));
+    const tag = (arr) => (arr || []).filter((x) => x && !x.gone).map((x) => Object.assign({}, x, { _world: true }));
+    worldOverlay = {
+      surfaces: tag(w.surfaces),
+      requests: tag(w.requests),
+      digPads: tag(w.digPads),
+      fleet: tag(w.fleet),
+      pins: tag(w.pins),
+      paths: tag(w.paths)
+    };
+    return worldOverlay;
+  }
+  /* Draw bags: World (read-only) + active write-target. Persist still uses `state` only. */
+  function viewBag(name) {
+    const local = state[name] || [];
+    if (mapMode !== 'channel') return local;
+    const world = worldOverlay[name] || [];
+    return world.concat(local);
+  }
+
   function slimState() {
     return {
       v: state.v,
@@ -4149,29 +4188,42 @@
 
   function drawSurfaces() {
     if (editLock) {
-      state.surfaces.forEach((s) => { if (!s.gone) updateSurfacePath(s); });
+      (state.surfaces || []).forEach((s) => { if (!s.gone) updateSurfacePath(s); });
       return;
     }
     layers.surfaces.clearLayers();
     handleGroup.clearLayers();
     Object.keys(surfacePaths).forEach((k) => { delete surfacePaths[k]; });
-    state.surfaces.forEach((s) => {
+    viewBag('surfaces').forEach((s) => {
       if (s.gone) return;
-      const on = selected && selected.kind === 'surface' && selected.id === s.id;
+      const world = isWorldFeature(s);
+      const on = !world && selected && selected.kind === 'surface' && selected.id === s.id;
+      let style = surfaceStyle(s.type === 'pile' ? 'pile' : s.type, on);
+      if (world) {
+        style = Object.assign({}, style, {
+          fillOpacity: Math.max(0.12, (style.fillOpacity || 0.4) * 0.55),
+          opacity: 0.75,
+          weight: Math.max(2, (style.weight || 3) - 1)
+        });
+      }
       let path;
       if (s.type === 'pile') {
         path = L.circle([s.lat, s.lng], Object.assign({
           radius: s.r, interactive: true
-        }, surfaceStyle('pile', on)));
+        }, style));
       } else {
-        path = L.polygon(rectCorners(s), Object.assign({ interactive: true }, surfaceStyle(s.type, on)));
+        path = L.polygon(rectCorners(s), Object.assign({ interactive: true }, style));
       }
       path.addTo(layers.surfaces);
-      surfacePaths[s.id] = { path };
-      wirePath(path, { kind: 'surface', id: s.id }, s);
-      if (on && !isSoftLocked(s)) {
-        if (s.type === 'pile') pileHandles(s);
-        else rectHandles(s);
+      if (!world) surfacePaths[s.id] = { path };
+      if (world) {
+        path.on('click', (e) => { L.DomEvent.stop(e); worldFeatureToast(); });
+      } else {
+        wirePath(path, { kind: 'surface', id: s.id }, s);
+        if (on && !isSoftLocked(s)) {
+          if (s.type === 'pile') pileHandles(s);
+          else rectHandles(s);
+        }
       }
     });
   }
@@ -4379,19 +4431,22 @@
   function drawRequests() {
     if (editLock) return;
     layers.requests.clearLayers();
-    state.requests.forEach((r) => {
+    viewBag('requests').forEach((r) => {
       if (r.gone) return;
-      const locked = isSoftLocked(r);
+      const world = isWorldFeature(r);
+      const locked = !world && isSoftLocked(r);
       const claimed = isOrderClaimed(r);
       const done = isOrderDone(r);
       const m = L.marker([r.lat, r.lng], {
         icon: reqIcon(r.kind, claimed, done),
-        draggable: !locked && !done,
-        zIndexOffset: (claimed || done) ? 380 : 400
+        draggable: !world && !locked && !done,
+        opacity: world ? 0.7 : 1,
+        zIndexOffset: world ? 300 : ((claimed || done) ? 380 : 400)
       });
       m.addTo(layers.requests);
       m.on('click', (e) => {
         L.DomEvent.stop(e);
+        if (world) { worldFeatureToast(); return; }
         /* Second tap on an already-selected unclaimed order = claim */
         if (selected && selected.kind === 'request' && selected.id === r.id && !isOrderClaimed(r)) {
           claimOrder(r);
@@ -4399,6 +4454,7 @@
         }
         select({ kind: 'request', id: r.id });
       });
+      if (world) return;
       if (locked) {
         m.on('dragstart', (e) => { L.DomEvent.stop(e); softLockToast(); });
       } else {
@@ -4482,9 +4538,10 @@
 
   function drawDigPads() {
     layers.dig.clearLayers();
-    state.digPads.forEach((d) => {
+    viewBag('digPads').forEach((d) => {
       if (d.gone) return;
-      const on = selected && selected.kind === 'dig' && selected.id === d.id;
+      const world = isWorldFeature(d);
+      const on = !world && selected && selected.kind === 'dig' && selected.id === d.id;
       const cols = {
         ready: { color: '#ff6a2a', fill: '#ff6a2a' },
         started: { color: '#f5d547', fill: '#f5d547' },
@@ -4495,16 +4552,22 @@
         color: cols.color,
         weight: on ? 6 : 4,
         fillColor: cols.fill,
-        fillOpacity: d.status === 'done' ? 0.18 : 0.4,
+        fillOpacity: world ? 0.16 : (d.status === 'done' ? 0.18 : 0.4),
+        opacity: world ? 0.7 : 1,
         interactive: true
       }).addTo(layers.dig);
-      poly.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'dig', id: d.id }); });
+      poly.on('click', (e) => {
+        L.DomEvent.stop(e);
+        if (world) worldFeatureToast();
+        else select({ kind: 'dig', id: d.id });
+      });
       const mid = centroid(d.corners.map((c) => L.latLng(c.lat, c.lng)));
       const html = SVG.shovel + '<span>' + fmtCut(d.cutFt) + '</span>';
       L.marker(mid, {
         icon: L.divIcon({ className: 'dig-badge ' + d.status, html, iconSize: [64, 28], iconAnchor: [32, 14] }),
         interactive: false,
-        zIndexOffset: 500
+        opacity: world ? 0.7 : 1,
+        zIndexOffset: world ? 420 : 500
       }).addTo(layers.dig);
     });
   }
@@ -4685,24 +4748,31 @@
     if (!layers || !layers.paths) return;
     layers.paths.clearLayers();
     ensurePaths();
-    (state.paths || []).forEach((p) => {
+    viewBag('paths').forEach((p) => {
       if (p.gone || !p.pts || p.pts.length < 1) return;
-      const on = selected && selected.kind === 'path' && selected.id === p.id;
-      const draft = !!(p.draft || (pathDraft && p.id === pathDraft.id));
+      const world = isWorldFeature(p);
+      const on = !world && selected && selected.kind === 'path' && selected.id === p.id;
+      const draft = !world && !!(p.draft || (pathDraft && p.id === pathDraft.id));
       const latlngs = p.pts.map((pt) => [pt.lat, pt.lng]);
       if (latlngs.length >= 2) {
         const style = pathStyle(p.tag, on, draft);
+        if (world) {
+          style.opacity = Math.min(style.opacity || 0.95, 0.55);
+          style.weight = Math.max(6, (style.weight || 10) - 2);
+        }
         L.polyline(latlngs, {
           color: '#111',
           weight: (style.weight || 8) + 6,
-          opacity: 0.9,
+          opacity: world ? 0.45 : 0.9,
           lineCap: 'round',
           lineJoin: 'round',
           interactive: false
         }).addTo(layers.paths);
         const line = L.polyline(latlngs, Object.assign({ interactive: !draft }, style));
         line.addTo(layers.paths);
-        if (!draft) {
+        if (world) {
+          line.on('click', (e) => { L.DomEvent.stop(e); worldFeatureToast(); });
+        } else if (!draft) {
           line.on('click', (e) => { L.DomEvent.stop(e); select({ kind: 'path', id: p.id }); });
         }
       }
@@ -4829,16 +4899,19 @@
     if (!layers || !layers.pins) return;
     if (editLock) return;
     layers.pins.clearLayers();
-    (state.pins || []).forEach((p) => {
+    viewBag('pins').forEach((p) => {
       if (p.gone || p.lat == null) return;
-      const on = selected && selected.kind === 'pin' && selected.id === p.id;
+      const world = isWorldFeature(p);
+      const on = !world && selected && selected.kind === 'pin' && selected.id === p.id;
       const m = L.marker([p.lat, p.lng], {
         icon: pinIcon(p, on),
-        zIndexOffset: 680,
-        draggable: true
+        zIndexOffset: world ? 560 : 680,
+        opacity: world ? 0.72 : 1,
+        draggable: !world
       }).addTo(layers.pins);
       m.on('click', (e) => {
         L.DomEvent.stop(e);
+        if (world) { worldFeatureToast(); return; }
         if (clickIsMarkerName(e)) {
           const uid = p.userId || p.by || '';
           if (uid) openUserProfile(uid);
@@ -4846,7 +4919,7 @@
         }
         select({ kind: 'pin', id: p.id });
       });
-      wirePixelDrag(m, () => state.pins, p.id);
+      if (!world) wirePixelDrag(m, () => state.pins, p.id);
     });
   }
 
@@ -4931,19 +5004,22 @@
     if (editLock) return; /* don't rebuild mid-drag from MQTT/renderAll — causes snap-back */
     layers.fleet.clearLayers();
     const opId = getOperatingMachineId();
-    (state.fleet || []).forEach((f) => {
+    viewBag('fleet').forEach((f) => {
       if (f.gone || f.lat == null) return;
+      const world = isWorldFeature(f);
       /* While I operate this unit, live GPS marker is me — don't also show parked pin */
-      if (opId && f.id === opId && f.inUse) return;
-      const on = selected && selected.kind === 'fleet' && selected.id === f.id;
-      /* Last-known stays until moved — always allow drag to update location */
+      if (!world && opId && f.id === opId && f.inUse) return;
+      const on = !world && selected && selected.kind === 'fleet' && selected.id === f.id;
+      /* Last-known stays until moved — always allow drag to update location (lobby/world write target only) */
       const m = L.marker([f.lat, f.lng], {
         icon: fleetIcon(f, on),
-        zIndexOffset: 700,
-        draggable: true
+        zIndexOffset: world ? 580 : 700,
+        opacity: world ? 0.72 : 1,
+        draggable: !world
       }).addTo(layers.fleet);
       m.on('click', (e) => {
         L.DomEvent.stop(e);
+        if (world) { worldFeatureToast(); return; }
         /* Body → object sheet; name label → profile */
         if (clickIsMarkerName(e)) {
           const uid = f.userId || f.by || '';
@@ -4952,7 +5028,7 @@
         }
         select({ kind: 'fleet', id: f.id });
       });
-      wirePixelDrag(m, () => state.fleet, f.id);
+      if (!world) wirePixelDrag(m, () => state.fleet, f.id);
     });
   }
 
@@ -5269,6 +5345,7 @@
   }
 
   function renderAll() {
+    try { refreshWorldOverlay(); } catch (eWo) {}
     ui.job();
     ui.role();
     ui.pinCount();

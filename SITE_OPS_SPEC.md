@@ -10,7 +10,7 @@ Last updated: 2026-09-13 (channels + layout picker: Excavation / Everyday)
 Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, scores, mods, presence, and object sheets on solo and channel maps.
 
 - After Google Sign-In → **Channels** screen (list / create / join).
-- **Close / Solo** → today’s basic solo map (SITE room).
+- **Close / World** → shared World map (SITE room; formerly Solo).
 - Open a channel → shared map for that channel (LIVE scoped per channel).
 - Tip pins, meetup times, photos, games: later (not v1).
 - You cannot change the map until you pick a role (clock-in).
@@ -28,22 +28,37 @@ Discord-style **map channels for everyone** (pivot 2026-09-13). Keep profiles, s
 - Create → mint code, add self as member, open that map room (`CH-{id}` MQTT / localStorage).
 - Join by code → add self, open room.
 - List = channels this device knows (local directory).
-- Solo map uses the existing SITE room (today’s ?v=44 experience).
+- World map uses the existing SITE room (today’s ?v=44 experience).
 - CHANNELS control on the map returns to the lobby without signing out.
 - Deep link: `?ch=CODE`.
 
 #
 ## Lobbies cream restyle (?v=59)
 
-`#channelsGate` / `.channels-card` restyled to Chris’s cream Lobbies mock: serif title, tabs **Yours** (default) | **Public** | **Create**, soft green accents. Yours cards from `loadChannelDir()` (map thumb placeholder, name, “• Yours” pill, Code + monospace green, `n / 8`, Live). Public stays empty (no fake data). Create uses in-card name + Everyday/Excavation purpose → existing `createChannel` / purpose lock. Solo map + join-by-code remain in the footer. Maps still only via Lobbies (?v=58).
+`#channelsGate` / `.channels-card` restyled to Chris’s cream Lobbies mock: serif title, tabs **Yours** (default) | **Public** | **Create**, soft green accents. Yours cards from `loadChannelDir()` (map thumb placeholder, name, “• Yours” pill, Code + monospace green, `n / 8`, Live). Public stays empty (no fake data). Create uses in-card name + Everyday/Excavation purpose → existing `createChannel` / purpose lock. World map + join-by-code remain in the footer. Maps still only via Lobbies (?v=58).
 
 ## Lobbies opt-in (?v=60)
 
-Lobbies sheet opens **only** from the Lobbies button — never on cold open / refresh. Close (✕) returns to the previous Solo/channel map. Do not persist `mode:lobby`.
+Lobbies sheet opens **only** from the Lobbies button — never on cold open / refresh. Close (✕) returns to the previous World/channel map. Do not persist `mode:lobby`.
+
+
+## World map + lobby-local overlays (?v=61)
+
+**World** is the main shared map (SITE room; UI rename of Solo). Edits on World write to the World store and appear as a base layer in **every** lobby (new and old), for all profiles.
+
+**Lobby** (channel) edits write only to that lobby’s store (`CH-{id}`). While viewing a lobby:
+- World features are drawn as a **read-only** base (pins, surfaces, requests, dig pads, fleet, paths).
+- Placing / drawing / deleting mutates **lobby state only** — World features are not changed from lobby tools.
+- Tap a World feature → toast to edit on World (no lobby mutation).
+
+**Lobbies stay opt-in (?v=60):** open only from the Lobbies button; ✕ closes back to the previous World/lobby map; never persist or cold-open `mode:lobby`. On restore, legacy `{mode:lobby}` is rewritten to `{mode:solo}` (World) on disk.
+
+Live sync remains per active room (World MQTT while on World; lobby MQTT while in a lobby). World overlay in a lobby is loaded from the local World snapshot (SITE), not dual-subscribed.
+
 
 ## Maps via Lobbies (?v=58)
 
-Solo and channel maps are **not** listed in the left sidebar / everyday rail. Open them only through the **Lobbies** button (lobby screen: Solo / create / join / your channels). Everyday pin tools stay in the rail.
+Solo and channel maps are **not** listed in the left sidebar / everyday rail. Open them only through the **Lobbies** button (lobby screen: World / create / join / your channels). Everyday pin tools stay in the rail.
 
 ## Everyday mock chrome (?v=57)
 
@@ -56,18 +71,18 @@ Layouts are **data** (`id`, `name`, tool list / HUD), not hard-coded forever. V1
 1. **Excavation** — current OnPad toolset (machines, water, paths, Site Ops, clock-in).
 2. **Everyday** — personal pins: House, Work, Friend, Family, Church, School, Gym, Restaurant, Coffee, Store, Grocery, Gas, Doctor, Pharmacy, Park, Trail, Meet, Parking, Other. Letter placeholders OK. Pins use object sheet (like/dislike/flag) + name; same tap rules.
 
-Flow: Google → Channels → Solo or channel → **pick layout** (or remember last) → map.
+Flow: Google → Lobbies → World or lobby → **pick layout** (or remember last) → map.
 
 Tool registry + layout presets so new pin types are additive. Channel custom layout editor later.
 
-- **Solo default layout = Everyday** (excavation is opt-in via LAYOUT).
+- **World default layout = Everyday** (excavation is opt-in via LAYOUT).
 - Channel LIVE presence is scoped to `CH-{id}` only; LEAVE/CHANNELS drops presence.
 - Top bar: address search (Nominatim) + driving directions (OSRM) + speed.
 - Left rail: Discord-style channel switch + layout tools.
-- **Solo = no bottom bar** (no Park/Switch/End / truck paths).
+- **World = no bottom bar** (no Park/Switch/End / truck paths).
 - Channel **purpose at create** locks layout + bottom chrome (Excavation → shift+truck; Everyday → blank bottom).
 - Bottom HUD clears Safari chrome via `--bottom-ui` (safe-area + browser chrome pad).
-- Cold open restores last Solo/channel (default Solo). **CHANNELS** badge is opt-in — not a forced lobby.
+- Cold open restores last World/channel (default World). **CHANNELS** badge is opt-in — not a forced lobby.
 - Top bar: slim Maps-style search; DIR/speed under ···; signed-in avatar chip.
 
 ---
